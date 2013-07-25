@@ -205,7 +205,9 @@ public class TestJdbcDriver extends TestCase {
     assertFalse(res.next());
     res = stmt.executeQuery("drop table " + dataTypeTableName);
     assertFalse(res.next());
-
+    res = stmt.executeQuery("drop table " + multibyteDataTableName);
+    assertFalse(res.next());
+    
     con.close();
     assertTrue("Connection should be closed", con.isClosed());
 
