@@ -72,6 +72,7 @@ public class TestJdbcDriver extends TestCase {
         .replace("c:", "");
     dataFilePath = new Path(dataFileDir, "kv1.txt");
     dataTypeDataFilePath = new Path(dataFileDir, "datatypes.txt");
+    multibyteDataFilePath = new Path(dataFileDir, "multibytedata.txt");
     standAloneServer = "true".equals(System
         .getProperty("test.service.standalone.server"));
   }
@@ -160,6 +161,22 @@ public class TestJdbcDriver extends TestCase {
         + " PARTITION (dt='20090619')");
     assertFalse(res.next());
 
+    // drop table. ignore error.
+    try {
+      stmt.executeQuery("drop table " + multibyteTableName);
+    } catch (Exception ex) {
+      fail(ex.toString());
+    }
+
+    res = stmt.executeQuery("create table " + multibyteTableName
+        + " (id int , value string");
+    assertFalse(res.next());
+
+    // load data
+    res = stmt.executeQuery("load data local inpath '"
+        + multibyteDataFilePath.toString() + "' into table " + multibyteTableName);
+    assertFalse(res.next());
+    
     // drop view. ignore error.
     try {
       stmt.executeQuery("drop view " + viewName);

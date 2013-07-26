@@ -153,7 +153,7 @@ public class HiveQueryResultSet extends HiveBaseResultSet {
 
       StructObjectInspector soi = (StructObjectInspector) serde.getObjectInspector();
       List<? extends StructField> fieldRefs = soi.getAllStructFieldRefs();
-      Object data = serde.deserialize(new BytesWritable(rowStr.getBytes()));
+      Object data = serde.deserialize(new BytesWritable(rowStr.getBytes("UTF-8")));
 
       assert row.size() == fieldRefs.size() : row.size() + ", " + fieldRefs.size();
       for (int i = 0; i < fieldRefs.size(); i++) {
