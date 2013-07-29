@@ -501,7 +501,7 @@ public class TestJdbcDriver extends TestCase {
     String expectedStrInUnicode = "\u3055\u304f\u3089";
     String factStr = res.getString(2);
     assertEquals(expectedStrInUnicode, factStr);
-      
+    
     // row 2
     assertTrue(res.next());
     assertEquals(2, meta.getColumnCount());
