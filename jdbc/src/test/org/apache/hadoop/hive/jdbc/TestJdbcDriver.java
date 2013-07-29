@@ -59,7 +59,7 @@ public class TestJdbcDriver extends TestCase {
   private static final String partitionedTableComment = "Partitioned table";
   private static final String dataTypeTableName = "testDataTypeTable";
   private static final String dataTypeTableComment = "Table with many column data types";
-    private static final String multibyteDataTableName = "testMultibyteDataTable";
+  private static final String multibyteDataTableName = "testMultibyteDataTable";
   private final HiveConf conf;
   private final Path dataFilePath;
   private final Path dataTypeDataFilePath;
@@ -171,7 +171,7 @@ public class TestJdbcDriver extends TestCase {
     }
 
     res = stmt.executeQuery("create table " + multibyteDataTableName
-        + " (id int , value string");
+        + " (id int , value string)");
     assertFalse(res.next());
 
     // load data
@@ -492,7 +492,7 @@ public class TestJdbcDriver extends TestCase {
     Statement stmt = con.createStatement();
 
     ResultSet res = stmt.executeQuery(
-        "select * from " + dataTypeTableName + " order by c1");
+        "select * from " + multibyteDataTableName);
     ResultSetMetaData meta = res.getMetaData();
 
     // row 1
@@ -500,45 +500,35 @@ public class TestJdbcDriver extends TestCase {
     assertEquals(2, meta.getColumnCount());
     String expectedStrInUnicode = "\u3055\u304f\u3089";
     String factStr = res.getString(2);
-    assertFalse(new String(expectedStrInUnicode.getBytes(), "Shift_JIS").equals(factStr));
-    assertFalse(new String(expectedStrInUnicode.getBytes(), "windows-31j").equals(factStr));
-    assertEquals(new String(expectedStrInUnicode.getBytes(), "UTF-8"), factStr);
-
+    assertEquals(expectedStrInUnicode, factStr);
+      
     // row 2
     assertTrue(res.next());
     assertEquals(2, meta.getColumnCount());
     expectedStrInUnicode = "\u30b1\u30fc\u30ad";
     factStr = res.getString(2);
-    assertFalse(new String(expectedStrInUnicode.getBytes(), "Shift_JIS").equals(factStr));
-    assertFalse(new String(expectedStrInUnicode.getBytes(), "windows-31j").equals(factStr));
-    assertEquals(new String(expectedStrInUnicode.getBytes(), "UTF-8"), factStr);
-
+    assertEquals(expectedStrInUnicode, factStr);
+    
     // row 3
     assertTrue(res.next());
     assertEquals(2, meta.getColumnCount());
-    expectedStrInUnicode = "\u733f\u7530\u6d69\u8f14";
+    expectedStrInUnicode = "\u713c\u304d\u8089";
     factStr = res.getString(2);
-    assertFalse(new String(expectedStrInUnicode.getBytes(), "Shift_JIS").equals(factStr));
-    assertFalse(new String(expectedStrInUnicode.getBytes(), "windows-31j").equals(factStr));
-    assertEquals(new String(expectedStrInUnicode.getBytes(), "UTF-8"), factStr);
-
+    assertEquals(expectedStrInUnicode, factStr);
+   
     // row 4
     assertTrue(res.next());
     assertEquals(2, meta.getColumnCount());
     expectedStrInUnicode = "\u0063\u0068\u006f\u0063\u006f\u006c\u0061\u0074\u0065";
     factStr = res.getString(2);
-    assertFalse(new String(expectedStrInUnicode.getBytes(), "Shift_JIS").equals(factStr));
-    assertFalse(new String(expectedStrInUnicode.getBytes(), "windows-31j").equals(factStr));
-    assertEquals(new String(expectedStrInUnicode.getBytes(), "UTF-8"), factStr);
-
+    assertEquals(expectedStrInUnicode, factStr);
+   
     // row 5
     assertTrue(res.next());
     assertEquals(2, meta.getColumnCount());
     expectedStrInUnicode = "\uff76\uff80\uff76\uff85";
     factStr = res.getString(2);
-    assertFalse(new String(expectedStrInUnicode.getBytes(), "Shift_JIS").equals(factStr));
-    assertFalse(new String(expectedStrInUnicode.getBytes(), "windows-31j").equals(factStr));
-    assertEquals(new String(expectedStrInUnicode.getBytes(), "UTF-8"), factStr);
+    assertEquals(expectedStrInUnicode, factStr);
   }
 
   private void doTestSelectAll(String tableName, int maxRows, int fetchSize) throws Exception {
