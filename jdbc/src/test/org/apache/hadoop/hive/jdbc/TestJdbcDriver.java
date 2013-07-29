@@ -515,14 +515,14 @@ public class TestJdbcDriver extends TestCase {
     expectedStrInUnicode = "\u713c\u304d\u8089";
     factStr = res.getString(2);
     assertEquals(expectedStrInUnicode, factStr);
-   
+    
     // row 4
     assertTrue(res.next());
     assertEquals(2, meta.getColumnCount());
     expectedStrInUnicode = "\u0063\u0068\u006f\u0063\u006f\u006c\u0061\u0074\u0065";
     factStr = res.getString(2);
     assertEquals(expectedStrInUnicode, factStr);
-   
+    
     // row 5
     assertTrue(res.next());
     assertEquals(2, meta.getColumnCount());
