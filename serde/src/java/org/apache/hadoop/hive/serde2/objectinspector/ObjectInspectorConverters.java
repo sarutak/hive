@@ -25,12 +25,14 @@ import java.util.Map;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.JavaStringObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorConverter;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
-import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableHiveDecimalObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableBinaryObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableBooleanObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableByteObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableDateObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableDoubleObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableFloatObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableHiveDecimalObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableHiveVarcharObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableIntObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableLongObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.SettableShortObjectInspector;
@@ -100,6 +102,14 @@ public final class ObjectInspectorConverters {
         return new PrimitiveObjectInspectorConverter.StringConverter(
             inputOI);
       }
+    case VARCHAR:
+      return new PrimitiveObjectInspectorConverter.HiveVarcharConverter(
+          inputOI,
+          (SettableHiveVarcharObjectInspector) outputOI);
+    case DATE:
+      return new PrimitiveObjectInspectorConverter.DateConverter(
+          inputOI,
+          (SettableDateObjectInspector) outputOI);
     case TIMESTAMP:
       return new PrimitiveObjectInspectorConverter.TimestampConverter(
           inputOI,
@@ -131,6 +141,7 @@ public final class ObjectInspectorConverters {
     if (inputOI.equals(outputOI)) {
       return new IdentityConverter();
     }
+    // TODO: Add support for UNION once SettableUnionObjectInspector is implemented.
     switch (outputOI.getCategory()) {
     case PRIMITIVE:
       return getConverter((PrimitiveObjectInspector) inputOI, (PrimitiveObjectInspector) outputOI);
@@ -150,39 +161,23 @@ public final class ObjectInspectorConverters {
     }
   }
 
-  // Return the settable equivalent object inspector for primitive categories
-  // For eg: for table T containing partitions p1 and p2 (possibly different
-  // from the table T), return the settable inspector for T. The inspector for
-  // T is settable recursively i.e all the nested fields are also settable.
-  private static ObjectInspector getSettableConvertedOI(
-      ObjectInspector inputOI) {
-    switch (inputOI.getCategory()) {
-    case PRIMITIVE:
-      PrimitiveObjectInspector primInputOI = (PrimitiveObjectInspector) inputOI;
-      return PrimitiveObjectInspectorFactory.
-          getPrimitiveWritableObjectInspector(primInputOI.getPrimitiveCategory());
-    case STRUCT:
-      return inputOI;
-    case LIST:
-      return inputOI;
-    case MAP:
-      return inputOI;
-    default:
-      throw new RuntimeException("Hive internal error: desired OI of "
-          + inputOI.getTypeName() + " not supported yet.");
-    }
-  }
-
   public static ObjectInspector getConvertedOI(
       ObjectInspector inputOI,
-      ObjectInspector outputOI) {
+      ObjectInspector outputOI,
+      boolean equalsCheck) {
     // If the inputOI is the same as the outputOI, just return it
-    if (inputOI.equals(outputOI)) {
+    if (equalsCheck && inputOI.equals(outputOI)) {
       return outputOI;
     }
+    // Return the settable equivalent object inspector for primitive categories
+    // For eg: for table T containing partitions p1 and p2 (possibly different
+    // from the table T), return the settable inspector for T. The inspector for
+    // T is settable recursively i.e all the nested fields are also settable.
+    // TODO: Add support for UNION once SettableUnionObjectInspector is implemented.
     switch (outputOI.getCategory()) {
     case PRIMITIVE:
-      return outputOI;
+      PrimitiveObjectInspector primInputOI = (PrimitiveObjectInspector) inputOI;
+      return PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(primInputOI);
     case STRUCT:
       StructObjectInspector structOutputOI = (StructObjectInspector) outputOI;
       if (structOutputOI.isSettable()) {
@@ -197,20 +192,22 @@ public final class ObjectInspectorConverters {
 
         for (StructField listField : listFields) {
           structFieldNames.add(listField.getFieldName());
-          structFieldObjectInspectors.add(
-              getSettableConvertedOI(listField.getFieldObjectInspector()));
+          structFieldObjectInspectors.add(getConvertedOI(listField.getFieldObjectInspector(),
+              listField.getFieldObjectInspector(), false));
         }
 
-        StandardStructObjectInspector structStandardOutputOI = ObjectInspectorFactory
-            .getStandardStructObjectInspector(
+        return ObjectInspectorFactory.getStandardStructObjectInspector(
                 structFieldNames,
                 structFieldObjectInspectors);
-        return structStandardOutputOI;
       }
     case LIST:
-      return outputOI;
+      ListObjectInspector listOutputOI = (ListObjectInspector) outputOI;
+      return ObjectInspectorFactory.getStandardListObjectInspector(
+          listOutputOI.getListElementObjectInspector());
     case MAP:
-      return outputOI;
+      MapObjectInspector mapOutputOI = (MapObjectInspector) outputOI;
+      return ObjectInspectorFactory.getStandardMapObjectInspector(
+          mapOutputOI.getMapKeyObjectInspector(), mapOutputOI.getMapValueObjectInspector());
     default:
       throw new RuntimeException("Hive internal error: conversion of "
           + inputOI.getTypeName() + " to " + outputOI.getTypeName()

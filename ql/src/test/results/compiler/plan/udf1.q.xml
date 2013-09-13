@@ -6,158 +6,161 @@
   </void> 
   <void property="work"> 
    <object class="org.apache.hadoop.hive.ql.plan.MapredWork"> 
-    <void property="aliasToPartnInfo"> 
-     <void method="put"> 
-      <string>src</string> 
-      <object class="org.apache.hadoop.hive.ql.plan.PartitionDesc"> 
-       <void property="deserializerClass"> 
-        <class>org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe</class> 
-       </void> 
-       <void property="inputFileFormatClass"> 
-        <class>org.apache.hadoop.mapred.TextInputFormat</class> 
-       </void> 
-       <void property="outputFileFormatClass"> 
-        <class>org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat</class> 
-       </void> 
-       <void property="partSpec"> 
-        <object class="java.util.LinkedHashMap"/> 
-       </void> 
-       <void property="properties"> 
-        <object class="java.util.Properties"> 
-         <void method="put"> 
-          <string>name</string> 
-          <string>default.src</string> 
-         </void> 
-         <void method="put"> 
-          <string>columns.types</string> 
-          <string>string:string</string> 
-         </void> 
-         <void method="put"> 
-          <string>serialization.ddl</string> 
-          <string>struct src { string key, string value}</string> 
-         </void> 
-         <void method="put"> 
-          <string>serialization.format</string> 
-          <string>1</string> 
-         </void> 
-         <void method="put"> 
-          <string>columns</string> 
-          <string>key,value</string> 
-         </void> 
-         <void method="put"> 
-          <string>bucket_count</string> 
-          <string>-1</string> 
-         </void> 
-         <void method="put"> 
-          <string>serialization.lib</string> 
-          <string>org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe</string> 
-         </void> 
-         <void method="put"> 
-          <string>file.inputformat</string> 
-          <string>org.apache.hadoop.mapred.TextInputFormat</string> 
-         </void> 
-         <void method="put"> 
-          <string>file.outputformat</string> 
-          <string>org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat</string> 
-         </void> 
-         <void method="put"> 
-          <string>location</string> 
-          #### A masked pattern was here #### 
-         </void> 
-        </object> 
-       </void> 
-       <void property="serdeClassName"> 
-        <string>org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe</string> 
-       </void> 
-       <void property="tableDesc"> 
-        <object class="org.apache.hadoop.hive.ql.plan.TableDesc"> 
-         <void property="deserializerClass"> 
-          <class>org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe</class> 
-         </void> 
-         <void property="inputFileFormatClass"> 
-          <class>org.apache.hadoop.mapred.TextInputFormat</class> 
-         </void> 
-         <void property="outputFileFormatClass"> 
-          <class>org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat</class> 
-         </void> 
-         <void property="properties"> 
-          <object class="java.util.Properties"> 
-           <void method="put"> 
-            <string>name</string> 
-            <string>default.src</string> 
-           </void> 
-           <void method="put"> 
-            <string>numFiles</string> 
-            <string>1</string> 
-           </void> 
-           <void method="put"> 
-            <string>columns.types</string> 
-            <string>string:string</string> 
-           </void> 
-           <void method="put"> 
-            <string>serialization.ddl</string> 
-            <string>struct src { string key, string value}</string> 
-           </void> 
-           <void method="put"> 
-            <string>serialization.format</string> 
-            <string>1</string> 
-           </void> 
-           <void method="put"> 
-            <string>columns</string> 
-            <string>key,value</string> 
-           </void> 
-           <void method="put"> 
-            <string>rawDataSize</string> 
-            <string>0</string> 
-           </void> 
-           <void method="put"> 
-            <string>numRows</string> 
-            <string>0</string> 
-           </void> 
-           <void method="put"> 
-            <string>numPartitions</string> 
-            <string>0</string> 
-           </void> 
-           <void method="put"> 
-            <string>bucket_count</string> 
-            <string>-1</string> 
-           </void> 
-           <void method="put"> 
-            <string>serialization.lib</string> 
-            <string>org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe</string> 
-           </void> 
-           <void method="put"> 
-            <string>file.inputformat</string> 
-            <string>org.apache.hadoop.mapred.TextInputFormat</string> 
-           </void> 
-           <void method="put"> 
-            <string>totalSize</string> 
-            <string>5812</string> 
-           </void> 
-           <void method="put"> 
-            <string>file.outputformat</string> 
-            <string>org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat</string> 
-           </void> 
-           <void method="put"> 
-            <string>location</string> 
-            #### A masked pattern was here #### 
-           </void> 
-           <void method="put"> 
-            <string>transient_lastDdlTime</string> 
-            #### A masked pattern was here #### 
-           </void> 
-          </object> 
-         </void> 
-         <void property="serdeClassName"> 
-          <string>org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe</string> 
-         </void> 
-        </object> 
-       </void> 
-      </object> 
-     </void> 
+    <void property="finalMapRed"> 
+     <boolean>true</boolean> 
     </void> 
-    <void property="aliasToWork"> 
-     <object class="java.util.LinkedHashMap"> 
+    <void property="mapWork"> 
+     <void property="aliasToPartnInfo"> 
+      <void method="put"> 
+       <string>src</string> 
+       <object class="org.apache.hadoop.hive.ql.plan.PartitionDesc"> 
+        <void property="deserializerClass"> 
+         <class>org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe</class> 
+        </void> 
+        <void property="inputFileFormatClass"> 
+         <class>org.apache.hadoop.mapred.TextInputFormat</class> 
+        </void> 
+        <void property="outputFileFormatClass"> 
+         <class>org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat</class> 
+        </void> 
+        <void property="partSpec"> 
+         <object class="java.util.LinkedHashMap"/> 
+        </void> 
+        <void property="properties"> 
+         <object class="java.util.Properties"> 
+          <void method="put"> 
+           <string>name</string> 
+           <string>default.src</string> 
+          </void> 
+          <void method="put"> 
+           <string>columns.types</string> 
+           <string>string:string</string> 
+          </void> 
+          <void method="put"> 
+           <string>serialization.ddl</string> 
+           <string>struct src { string key, string value}</string> 
+          </void> 
+          <void method="put"> 
+           <string>serialization.format</string> 
+           <string>1</string> 
+          </void> 
+          <void method="put"> 
+           <string>columns</string> 
+           <string>key,value</string> 
+          </void> 
+          <void method="put"> 
+           <string>bucket_count</string> 
+           <string>-1</string> 
+          </void> 
+          <void method="put"> 
+           <string>serialization.lib</string> 
+           <string>org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe</string> 
+          </void> 
+          <void method="put"> 
+           <string>file.inputformat</string> 
+           <string>org.apache.hadoop.mapred.TextInputFormat</string> 
+          </void> 
+          <void method="put"> 
+           <string>file.outputformat</string> 
+           <string>org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat</string> 
+          </void> 
+          <void method="put"> 
+           <string>location</string> 
+           #### A masked pattern was here #### 
+          </void> 
+         </object> 
+        </void> 
+        <void property="serdeClassName"> 
+         <string>org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe</string> 
+        </void> 
+        <void property="tableDesc"> 
+         <object class="org.apache.hadoop.hive.ql.plan.TableDesc"> 
+          <void property="deserializerClass"> 
+           <class>org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe</class> 
+          </void> 
+          <void property="inputFileFormatClass"> 
+           <class>org.apache.hadoop.mapred.TextInputFormat</class> 
+          </void> 
+          <void property="outputFileFormatClass"> 
+           <class>org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat</class> 
+          </void> 
+          <void property="properties"> 
+           <object class="java.util.Properties"> 
+            <void method="put"> 
+             <string>name</string> 
+             <string>default.src</string> 
+            </void> 
+            <void method="put"> 
+             <string>numFiles</string> 
+             <string>1</string> 
+            </void> 
+            <void method="put"> 
+             <string>columns.types</string> 
+             <string>string:string</string> 
+            </void> 
+            <void method="put"> 
+             <string>serialization.ddl</string> 
+             <string>struct src { string key, string value}</string> 
+            </void> 
+            <void method="put"> 
+             <string>serialization.format</string> 
+             <string>1</string> 
+            </void> 
+            <void method="put"> 
+             <string>columns</string> 
+             <string>key,value</string> 
+            </void> 
+            <void method="put"> 
+             <string>rawDataSize</string> 
+             <string>0</string> 
+            </void> 
+            <void method="put"> 
+             <string>numRows</string> 
+             <string>0</string> 
+            </void> 
+            <void method="put"> 
+             <string>numPartitions</string> 
+             <string>0</string> 
+            </void> 
+            <void method="put"> 
+             <string>bucket_count</string> 
+             <string>-1</string> 
+            </void> 
+            <void method="put"> 
+             <string>serialization.lib</string> 
+             <string>org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe</string> 
+            </void> 
+            <void method="put"> 
+             <string>file.inputformat</string> 
+             <string>org.apache.hadoop.mapred.TextInputFormat</string> 
+            </void> 
+            <void method="put"> 
+             <string>totalSize</string> 
+             <string>5812</string> 
+            </void> 
+            <void method="put"> 
+             <string>file.outputformat</string> 
+             <string>org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat</string> 
+            </void> 
+            <void method="put"> 
+             <string>location</string> 
+             #### A masked pattern was here #### 
+            </void> 
+            <void method="put"> 
+             <string>transient_lastDdlTime</string> 
+             #### A masked pattern was here #### 
+            </void> 
+           </object> 
+          </void> 
+          <void property="serdeClassName"> 
+           <string>org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe</string> 
+          </void> 
+         </object> 
+        </void> 
+       </object> 
+      </void> 
+     </void> 
+     <void property="aliasToWork"> 
       <void method="put"> 
        <string>src</string> 
        <object id="TableScanOperator0" class="org.apache.hadoop.hive.ql.exec.TableScanOperator"> 
@@ -274,6 +277,9 @@
                             </void> 
                            </object> 
                           </void> 
+                          <void property="typeName"> 
+                           <string>boolean</string> 
+                          </void> 
                          </object> 
                         </void> 
                         <void method="add"> 
@@ -286,6 +292,9 @@
                           </void> 
                           <void property="type"> 
                            <object idref="PrimitiveTypeInfo0"/> 
+                          </void> 
+                          <void property="typeName"> 
+                           <string>boolean</string> 
                           </void> 
                          </object> 
                         </void> 
@@ -300,6 +309,9 @@
                           <void property="type"> 
                            <object idref="PrimitiveTypeInfo0"/> 
                           </void> 
+                          <void property="typeName"> 
+                           <string>boolean</string> 
+                          </void> 
                          </object> 
                         </void> 
                         <void method="add"> 
@@ -312,6 +324,9 @@
                           </void> 
                           <void property="type"> 
                            <object idref="PrimitiveTypeInfo0"/> 
+                          </void> 
+                          <void property="typeName"> 
+                           <string>boolean</string> 
                           </void> 
                          </object> 
                         </void> 
@@ -326,6 +341,9 @@
                           <void property="type"> 
                            <object idref="PrimitiveTypeInfo0"/> 
                           </void> 
+                          <void property="typeName"> 
+                           <string>boolean</string> 
+                          </void> 
                          </object> 
                         </void> 
                         <void method="add"> 
@@ -338,6 +356,9 @@
                           </void> 
                           <void property="type"> 
                            <object idref="PrimitiveTypeInfo0"/> 
+                          </void> 
+                          <void property="typeName"> 
+                           <string>boolean</string> 
                           </void> 
                          </object> 
                         </void> 
@@ -352,6 +373,9 @@
                           <void property="type"> 
                            <object idref="PrimitiveTypeInfo0"/> 
                           </void> 
+                          <void property="typeName"> 
+                           <string>boolean</string> 
+                          </void> 
                          </object> 
                         </void> 
                         <void method="add"> 
@@ -364,6 +388,9 @@
                           </void> 
                           <void property="type"> 
                            <object idref="PrimitiveTypeInfo0"/> 
+                          </void> 
+                          <void property="typeName"> 
+                           <string>boolean</string> 
                           </void> 
                          </object> 
                         </void> 
@@ -378,6 +405,9 @@
                           <void property="type"> 
                            <object idref="PrimitiveTypeInfo0"/> 
                           </void> 
+                          <void property="typeName"> 
+                           <string>boolean</string> 
+                          </void> 
                          </object> 
                         </void> 
                         <void method="add"> 
@@ -390,6 +420,9 @@
                           </void> 
                           <void property="type"> 
                            <object idref="PrimitiveTypeInfo0"/> 
+                          </void> 
+                          <void property="typeName"> 
+                           <string>boolean</string> 
                           </void> 
                          </object> 
                         </void> 
@@ -404,6 +437,9 @@
                           <void property="type"> 
                            <object idref="PrimitiveTypeInfo0"/> 
                           </void> 
+                          <void property="typeName"> 
+                           <string>boolean</string> 
+                          </void> 
                          </object> 
                         </void> 
                         <void method="add"> 
@@ -417,6 +453,9 @@
                           <void property="type"> 
                            <object idref="PrimitiveTypeInfo0"/> 
                           </void> 
+                          <void property="typeName"> 
+                           <string>boolean</string> 
+                          </void> 
                          </object> 
                         </void> 
                         <void method="add"> 
@@ -429,6 +468,9 @@
                           </void> 
                           <void property="type"> 
                            <object idref="PrimitiveTypeInfo0"/> 
+                          </void> 
+                          <void property="typeName"> 
+                           <string>boolean</string> 
                           </void> 
                          </object> 
                         </void> 
@@ -447,6 +489,9 @@
                             </void> 
                            </object> 
                           </void> 
+                          <void property="typeName"> 
+                           <string>string</string> 
+                          </void> 
                          </object> 
                         </void> 
                         <void method="add"> 
@@ -459,6 +504,9 @@
                           </void> 
                           <void property="type"> 
                            <object idref="PrimitiveTypeInfo1"/> 
+                          </void> 
+                          <void property="typeName"> 
+                           <string>string</string> 
                           </void> 
                          </object> 
                         </void> 
@@ -473,6 +521,9 @@
                           <void property="type"> 
                            <object idref="PrimitiveTypeInfo1"/> 
                           </void> 
+                          <void property="typeName"> 
+                           <string>string</string> 
+                          </void> 
                          </object> 
                         </void> 
                         <void method="add"> 
@@ -485,6 +536,9 @@
                           </void> 
                           <void property="type"> 
                            <object idref="PrimitiveTypeInfo1"/> 
+                          </void> 
+                          <void property="typeName"> 
+                           <string>string</string> 
                           </void> 
                          </object> 
                         </void> 
@@ -529,9 +583,6 @@
                      <object class="org.apache.hadoop.hive.ql.udf.generic.GenericUDFBridge"> 
                       <void property="operator"> 
                        <boolean>true</boolean> 
-                      </void> 
-                      <void property="udfClass"> 
-                       <class>org.apache.hadoop.hive.ql.udf.UDFRegExp</class> 
                       </void> 
                       <void property="udfClassName"> 
                        <string>org.apache.hadoop.hive.ql.udf.UDFRegExp</string> 
@@ -578,9 +629,6 @@
                       <void property="operator"> 
                        <boolean>true</boolean> 
                       </void> 
-                      <void property="udfClass"> 
-                       <class>org.apache.hadoop.hive.ql.udf.UDFLike</class> 
-                      </void> 
                       <void property="udfClassName"> 
                        <string>org.apache.hadoop.hive.ql.udf.UDFLike</string> 
                       </void> 
@@ -625,9 +673,6 @@
                      <object class="org.apache.hadoop.hive.ql.udf.generic.GenericUDFBridge"> 
                       <void property="operator"> 
                        <boolean>true</boolean> 
-                      </void> 
-                      <void property="udfClass"> 
-                       <class>org.apache.hadoop.hive.ql.udf.UDFLike</class> 
                       </void> 
                       <void property="udfClassName"> 
                        <string>org.apache.hadoop.hive.ql.udf.UDFLike</string> 
@@ -674,9 +719,6 @@
                       <void property="operator"> 
                        <boolean>true</boolean> 
                       </void> 
-                      <void property="udfClass"> 
-                       <class>org.apache.hadoop.hive.ql.udf.UDFLike</class> 
-                      </void> 
                       <void property="udfClassName"> 
                        <string>org.apache.hadoop.hive.ql.udf.UDFLike</string> 
                       </void> 
@@ -721,9 +763,6 @@
                      <object class="org.apache.hadoop.hive.ql.udf.generic.GenericUDFBridge"> 
                       <void property="operator"> 
                        <boolean>true</boolean> 
-                      </void> 
-                      <void property="udfClass"> 
-                       <class>org.apache.hadoop.hive.ql.udf.UDFLike</class> 
                       </void> 
                       <void property="udfClassName"> 
                        <string>org.apache.hadoop.hive.ql.udf.UDFLike</string> 
@@ -770,9 +809,6 @@
                       <void property="operator"> 
                        <boolean>true</boolean> 
                       </void> 
-                      <void property="udfClass"> 
-                       <class>org.apache.hadoop.hive.ql.udf.UDFLike</class> 
-                      </void> 
                       <void property="udfClassName"> 
                        <string>org.apache.hadoop.hive.ql.udf.UDFLike</string> 
                       </void> 
@@ -817,9 +853,6 @@
                      <object class="org.apache.hadoop.hive.ql.udf.generic.GenericUDFBridge"> 
                       <void property="operator"> 
                        <boolean>true</boolean> 
-                      </void> 
-                      <void property="udfClass"> 
-                       <class>org.apache.hadoop.hive.ql.udf.UDFLike</class> 
                       </void> 
                       <void property="udfClassName"> 
                        <string>org.apache.hadoop.hive.ql.udf.UDFLike</string> 
@@ -866,9 +899,6 @@
                       <void property="operator"> 
                        <boolean>true</boolean> 
                       </void> 
-                      <void property="udfClass"> 
-                       <class>org.apache.hadoop.hive.ql.udf.UDFLike</class> 
-                      </void> 
                       <void property="udfClassName"> 
                        <string>org.apache.hadoop.hive.ql.udf.UDFLike</string> 
                       </void> 
@@ -913,9 +943,6 @@
                      <object class="org.apache.hadoop.hive.ql.udf.generic.GenericUDFBridge"> 
                       <void property="operator"> 
                        <boolean>true</boolean> 
-                      </void> 
-                      <void property="udfClass"> 
-                       <class>org.apache.hadoop.hive.ql.udf.UDFRegExp</class> 
                       </void> 
                       <void property="udfClassName"> 
                        <string>org.apache.hadoop.hive.ql.udf.UDFRegExp</string> 
@@ -969,9 +996,6 @@
                     </void> 
                     <void property="genericUDF"> 
                      <object class="org.apache.hadoop.hive.ql.udf.generic.GenericUDFBridge"> 
-                      <void property="udfClass"> 
-                       <class>org.apache.hadoop.hive.ql.udf.UDFRegExpReplace</class> 
-                      </void> 
                       <void property="udfClassName"> 
                        <string>org.apache.hadoop.hive.ql.udf.UDFRegExpReplace</string> 
                       </void> 
@@ -1016,9 +1040,6 @@
                      <object class="org.apache.hadoop.hive.ql.udf.generic.GenericUDFBridge"> 
                       <void property="operator"> 
                        <boolean>true</boolean> 
-                      </void> 
-                      <void property="udfClass"> 
-                       <class>org.apache.hadoop.hive.ql.udf.UDFRegExp</class> 
                       </void> 
                       <void property="udfClassName"> 
                        <string>org.apache.hadoop.hive.ql.udf.UDFRegExp</string> 
@@ -1065,9 +1086,6 @@
                       <void property="operator"> 
                        <boolean>true</boolean> 
                       </void> 
-                      <void property="udfClass"> 
-                       <class>org.apache.hadoop.hive.ql.udf.UDFRegExp</class> 
-                      </void> 
                       <void property="udfClassName"> 
                        <string>org.apache.hadoop.hive.ql.udf.UDFRegExp</string> 
                       </void> 
@@ -1112,9 +1130,6 @@
                      <object class="org.apache.hadoop.hive.ql.udf.generic.GenericUDFBridge"> 
                       <void property="operator"> 
                        <boolean>true</boolean> 
-                      </void> 
-                      <void property="udfClass"> 
-                       <class>org.apache.hadoop.hive.ql.udf.UDFRegExp</class> 
                       </void> 
                       <void property="udfClassName"> 
                        <string>org.apache.hadoop.hive.ql.udf.UDFRegExp</string> 
@@ -1168,9 +1183,6 @@
                     </void> 
                     <void property="genericUDF"> 
                      <object class="org.apache.hadoop.hive.ql.udf.generic.GenericUDFBridge"> 
-                      <void property="udfClass"> 
-                       <class>org.apache.hadoop.hive.ql.udf.UDFRegExpReplace</class> 
-                      </void> 
                       <void property="udfClassName"> 
                        <string>org.apache.hadoop.hive.ql.udf.UDFRegExpReplace</string> 
                       </void> 
@@ -1223,9 +1235,6 @@
                     </void> 
                     <void property="genericUDF"> 
                      <object class="org.apache.hadoop.hive.ql.udf.generic.GenericUDFBridge"> 
-                      <void property="udfClass"> 
-                       <class>org.apache.hadoop.hive.ql.udf.UDFRegExpReplace</class> 
-                      </void> 
                       <void property="udfClassName"> 
                        <string>org.apache.hadoop.hive.ql.udf.UDFRegExpReplace</string> 
                       </void> 
@@ -1278,9 +1287,6 @@
                     </void> 
                     <void property="genericUDF"> 
                      <object class="org.apache.hadoop.hive.ql.udf.generic.GenericUDFBridge"> 
-                      <void property="udfClass"> 
-                       <class>org.apache.hadoop.hive.ql.udf.UDFRegExpReplace</class> 
-                      </void> 
                       <void property="udfClassName"> 
                        <string>org.apache.hadoop.hive.ql.udf.UDFRegExpReplace</string> 
                       </void> 
@@ -1325,9 +1331,6 @@
                      <object class="org.apache.hadoop.hive.ql.udf.generic.GenericUDFBridge"> 
                       <void property="operator"> 
                        <boolean>true</boolean> 
-                      </void> 
-                      <void property="udfClass"> 
-                       <class>org.apache.hadoop.hive.ql.udf.UDFLike</class> 
                       </void> 
                       <void property="udfClassName"> 
                        <string>org.apache.hadoop.hive.ql.udf.UDFLike</string> 
@@ -1499,6 +1502,9 @@
                       <void property="type"> 
                        <object idref="PrimitiveTypeInfo0"/> 
                       </void> 
+                      <void property="typeName"> 
+                       <string>boolean</string> 
+                      </void> 
                      </object> 
                     </void> 
                     <void method="add"> 
@@ -1511,6 +1517,9 @@
                       </void> 
                       <void property="type"> 
                        <object idref="PrimitiveTypeInfo0"/> 
+                      </void> 
+                      <void property="typeName"> 
+                       <string>boolean</string> 
                       </void> 
                      </object> 
                     </void> 
@@ -1525,6 +1534,9 @@
                       <void property="type"> 
                        <object idref="PrimitiveTypeInfo0"/> 
                       </void> 
+                      <void property="typeName"> 
+                       <string>boolean</string> 
+                      </void> 
                      </object> 
                     </void> 
                     <void method="add"> 
@@ -1537,6 +1549,9 @@
                       </void> 
                       <void property="type"> 
                        <object idref="PrimitiveTypeInfo0"/> 
+                      </void> 
+                      <void property="typeName"> 
+                       <string>boolean</string> 
                       </void> 
                      </object> 
                     </void> 
@@ -1551,6 +1566,9 @@
                       <void property="type"> 
                        <object idref="PrimitiveTypeInfo0"/> 
                       </void> 
+                      <void property="typeName"> 
+                       <string>boolean</string> 
+                      </void> 
                      </object> 
                     </void> 
                     <void method="add"> 
@@ -1563,6 +1581,9 @@
                       </void> 
                       <void property="type"> 
                        <object idref="PrimitiveTypeInfo0"/> 
+                      </void> 
+                      <void property="typeName"> 
+                       <string>boolean</string> 
                       </void> 
                      </object> 
                     </void> 
@@ -1577,6 +1598,9 @@
                       <void property="type"> 
                        <object idref="PrimitiveTypeInfo0"/> 
                       </void> 
+                      <void property="typeName"> 
+                       <string>boolean</string> 
+                      </void> 
                      </object> 
                     </void> 
                     <void method="add"> 
@@ -1589,6 +1613,9 @@
                       </void> 
                       <void property="type"> 
                        <object idref="PrimitiveTypeInfo0"/> 
+                      </void> 
+                      <void property="typeName"> 
+                       <string>boolean</string> 
                       </void> 
                      </object> 
                     </void> 
@@ -1603,6 +1630,9 @@
                       <void property="type"> 
                        <object idref="PrimitiveTypeInfo0"/> 
                       </void> 
+                      <void property="typeName"> 
+                       <string>boolean</string> 
+                      </void> 
                      </object> 
                     </void> 
                     <void method="add"> 
@@ -1615,6 +1645,9 @@
                       </void> 
                       <void property="type"> 
                        <object idref="PrimitiveTypeInfo0"/> 
+                      </void> 
+                      <void property="typeName"> 
+                       <string>boolean</string> 
                       </void> 
                      </object> 
                     </void> 
@@ -1629,6 +1662,9 @@
                       <void property="type"> 
                        <object idref="PrimitiveTypeInfo0"/> 
                       </void> 
+                      <void property="typeName"> 
+                       <string>boolean</string> 
+                      </void> 
                      </object> 
                     </void> 
                     <void method="add"> 
@@ -1641,6 +1677,9 @@
                       </void> 
                       <void property="type"> 
                        <object idref="PrimitiveTypeInfo0"/> 
+                      </void> 
+                      <void property="typeName"> 
+                       <string>boolean</string> 
                       </void> 
                      </object> 
                     </void> 
@@ -1655,6 +1694,9 @@
                       <void property="type"> 
                        <object idref="PrimitiveTypeInfo0"/> 
                       </void> 
+                      <void property="typeName"> 
+                       <string>boolean</string> 
+                      </void> 
                      </object> 
                     </void> 
                     <void method="add"> 
@@ -1667,6 +1709,9 @@
                       </void> 
                       <void property="type"> 
                        <object idref="PrimitiveTypeInfo1"/> 
+                      </void> 
+                      <void property="typeName"> 
+                       <string>string</string> 
                       </void> 
                      </object> 
                     </void> 
@@ -1681,6 +1726,9 @@
                       <void property="type"> 
                        <object idref="PrimitiveTypeInfo1"/> 
                       </void> 
+                      <void property="typeName"> 
+                       <string>string</string> 
+                      </void> 
                      </object> 
                     </void> 
                     <void method="add"> 
@@ -1694,6 +1742,9 @@
                       <void property="type"> 
                        <object idref="PrimitiveTypeInfo1"/> 
                       </void> 
+                      <void property="typeName"> 
+                       <string>string</string> 
+                      </void> 
                      </object> 
                     </void> 
                     <void method="add"> 
@@ -1706,6 +1757,9 @@
                       </void> 
                       <void property="type"> 
                        <object idref="PrimitiveTypeInfo1"/> 
+                      </void> 
+                      <void property="typeName"> 
+                       <string>string</string> 
                       </void> 
                      </object> 
                     </void> 
@@ -1741,12 +1795,12 @@
                     <void property="typeInfo"> 
                      <object class="org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo"> 
                       <void property="typeName"> 
-                       <string>double</string> 
+                       <string>int</string> 
                       </void> 
                      </object> 
                     </void> 
                     <void property="value"> 
-                     <double>86.0</double> 
+                     <int>86</int> 
                     </void> 
                    </object> 
                   </void> 
@@ -1803,6 +1857,9 @@
                   <void property="type"> 
                    <object idref="PrimitiveTypeInfo1"/> 
                   </void> 
+                  <void property="typeName"> 
+                   <string>string</string> 
+                  </void> 
                  </object> 
                 </void> 
                </object> 
@@ -1846,6 +1903,13 @@
           </void> 
          </object> 
         </void> 
+        <void property="neededColumns"> 
+         <object class="java.util.ArrayList"> 
+          <void method="add"> 
+           <string>key</string> 
+          </void> 
+         </object> 
+        </void> 
         <void property="operatorId"> 
          <string>TS_0</string> 
         </void> 
@@ -1867,6 +1931,9 @@
               <void property="type"> 
                <object idref="PrimitiveTypeInfo1"/> 
               </void> 
+              <void property="typeName"> 
+               <string>string</string> 
+              </void> 
              </object> 
             </void> 
             <void method="add"> 
@@ -1887,6 +1954,9 @@
                 </void> 
                </object> 
               </void> 
+              <void property="typeName"> 
+               <string>bigint</string> 
+              </void> 
              </object> 
             </void> 
             <void method="add"> 
@@ -1903,6 +1973,9 @@
               <void property="type"> 
                <object idref="PrimitiveTypeInfo1"/> 
               </void> 
+              <void property="typeName"> 
+               <string>string</string> 
+              </void> 
              </object> 
             </void> 
            </object> 
@@ -1911,16 +1984,8 @@
         </void> 
        </object> 
       </void> 
-     </object> 
-    </void> 
-    <void property="finalMapRed"> 
-     <boolean>true</boolean> 
-    </void> 
-    <void property="nameToSplitSample"> 
-     <object class="java.util.HashMap"/> 
-    </void> 
-    <void property="pathToAliases"> 
-     <object class="java.util.LinkedHashMap"> 
+     </void> 
+     <void property="pathToAliases"> 
       <void method="put"> 
        #### A masked pattern was here #### 
        <object class="java.util.ArrayList"> 
@@ -1929,10 +1994,8 @@
         </void> 
        </object> 
       </void> 
-     </object> 
-    </void> 
-    <void property="pathToPartitionInfo"> 
-     <object class="java.util.LinkedHashMap"> 
+     </void> 
+     <void property="pathToPartitionInfo"> 
       <void method="put"> 
        #### A masked pattern was here #### 
        <object class="org.apache.hadoop.hive.ql.plan.PartitionDesc"> 
@@ -2108,10 +2171,7 @@
         </void> 
        </object> 
       </void> 
-     </object> 
-    </void> 
-    <void property="tagToValueDesc"> 
-     <object class="java.util.ArrayList"/> 
+     </void> 
     </void> 
    </object> 
   </void> 

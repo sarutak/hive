@@ -30,7 +30,6 @@ import org.apache.hadoop.hive.serde2.objectinspector.ListObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.MapObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
-import org.apache.hadoop.hive.serde2.objectinspector.StandardStructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.StructField;
 import org.apache.hadoop.hive.serde2.objectinspector.StructObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.UnionObjectInspector;
@@ -40,10 +39,12 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.BooleanObjectInsp
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.ByteObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.DoubleObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.FloatObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveVarcharObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.IntObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.LongObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.ShortObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.StringObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.DateObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.TimestampObjectInspector;
 import org.apache.hadoop.io.BytesWritable;
 import org.apache.hadoop.io.Text;
@@ -283,6 +284,20 @@ public final class SerDeUtils {
           sb.append('"');
           break;
         }
+        case VARCHAR: {
+          sb.append('"');
+          sb.append(escapeString(((HiveVarcharObjectInspector) poi)
+              .getPrimitiveJavaObject(o).toString()));
+          sb.append('"');
+          break;
+        }
+        case DATE: {
+          sb.append('"');
+          sb.append(((DateObjectInspector) poi)
+              .getPrimitiveWritableObject(o));
+          sb.append('"');
+          break;
+        }
         case TIMESTAMP: {
           sb.append('"');
           sb.append(((TimestampObjectInspector) poi)
@@ -397,7 +412,7 @@ public final class SerDeUtils {
   /**
    * return false though element is null if nullsafe flag is true for that
    */
-  public static boolean hasAnyNullObject(List o, StandardStructObjectInspector loi,
+  public static boolean hasAnyNullObject(List o, StructObjectInspector loi,
       boolean[] nullSafes) {
     List<? extends StructField> fields = loi.getAllStructFieldRefs();
     for (int i = 0; i < o.size();i++) {

@@ -134,7 +134,7 @@ public class MapJoinProcessor implements Transform {
         new LinkedHashMap<String, FetchWork>());
 
     for (Map.Entry<String, Operator<? extends OperatorDesc>> entry :
-      newWork.getAliasToWork().entrySet()) {
+      newWork.getMapWork().getAliasToWork().entrySet()) {
       String alias = entry.getKey();
       Operator<? extends OperatorDesc> op = entry.getValue();
 
@@ -162,7 +162,7 @@ public class MapJoinProcessor implements Transform {
       smallTableAliasList.add(alias);
       // get input path and remove this alias from pathToAlias
       // because this file will be fetched by fetch operator
-      LinkedHashMap<String, ArrayList<String>> pathToAliases = newWork.getPathToAliases();
+      LinkedHashMap<String, ArrayList<String>> pathToAliases = newWork.getMapWork().getPathToAliases();
 
       // keep record all the input path for this alias
       HashSet<String> pathSet = new HashSet<String>();
@@ -193,7 +193,7 @@ public class MapJoinProcessor implements Transform {
       List<PartitionDesc> partDesc = new ArrayList<PartitionDesc>();
 
       for (String tablePath : pathSet) {
-        PartitionDesc partitionDesc = newWork.getPathToPartitionInfo().get(tablePath);
+        PartitionDesc partitionDesc = newWork.getMapWork().getPathToPartitionInfo().get(tablePath);
         // create fetchwork for non partitioned table
         if (partitionDesc.getPartSpec() == null || partitionDesc.getPartSpec().size() == 0) {
           fetchWork = new FetchWork(tablePath, partitionDesc.getTableDesc());
@@ -205,7 +205,7 @@ public class MapJoinProcessor implements Transform {
       }
       // create fetchwork for partitioned table
       if (fetchWork == null) {
-        TableDesc table = newWork.getAliasToPartnInfo().get(alias).getTableDesc();
+        TableDesc table = newWork.getMapWork().getAliasToPartnInfo().get(alias).getTableDesc();
         fetchWork = new FetchWork(partDir, partDesc, table);
       }
       // set alias to fetch work
@@ -213,13 +213,13 @@ public class MapJoinProcessor implements Transform {
     }
     // remove small table ailias from aliasToWork;Avoid concurrent modification
     for (String alias : smallTableAliasList) {
-      newWork.getAliasToWork().remove(alias);
+      newWork.getMapWork().getAliasToWork().remove(alias);
     }
 
     // set up local work
-    newWork.setMapLocalWork(newLocalWork);
+    newWork.getMapWork().setMapLocalWork(newLocalWork);
     // remove reducer
-    newWork.setReducer(null);
+    newWork.setReduceWork(null);
     // return the big table alias
     if (bigTableAlias == null) {
       throw new SemanticException("Big Table Alias is null");
@@ -240,8 +240,8 @@ public class MapJoinProcessor implements Transform {
   public static String genMapJoinOpAndLocalWork(MapredWork newWork, JoinOperator op, int mapJoinPos)
       throws SemanticException {
     LinkedHashMap<Operator<? extends OperatorDesc>, OpParseContext> opParseCtxMap =
-        newWork.getOpParseCtxMap();
-    QBJoinTree newJoinTree = newWork.getJoinTree();
+        newWork.getMapWork().getOpParseCtxMap();
+    QBJoinTree newJoinTree = newWork.getMapWork().getJoinTree();
     // generate the map join operator; already checked the map join
     MapJoinOperator newMapJoinOp = MapJoinProcessor.convertMapJoin(opParseCtxMap, op,
         newJoinTree, mapJoinPos, true, false);
@@ -256,8 +256,8 @@ public class MapJoinProcessor implements Transform {
       String bigTableAlias = MapJoinProcessor
           .genMapJoinLocalWork(newWork, newMapJoinOp, mapJoinPos);
       // clean up the mapred work
-      newWork.setOpParseCtxMap(null);
-      newWork.setJoinTree(null);
+      newWork.getMapWork().setOpParseCtxMap(null);
+      newWork.getMapWork().setJoinTree(null);
 
       return bigTableAlias;
 
@@ -328,14 +328,13 @@ public class MapJoinProcessor implements Transform {
     Byte[] tagOrder = desc.getTagOrder();
 
     if (!noCheckOuterJoin) {
-      checkMapJoin(mapJoinPos, condns);
+      if (checkMapJoin(mapJoinPos, condns) < 0) {
+        throw new SemanticException(ErrorMsg.NO_OUTER_MAPJOIN.getMsg());
+      }
     }
 
-    RowResolver oldOutputRS = opParseCtxMap.get(op).getRowResolver();
-    RowResolver outputRS = new RowResolver();
-    ArrayList<String> outputColumnNames = new ArrayList<String>();
+    RowResolver outputRS = opParseCtxMap.get(op).getRowResolver();
     Map<Byte, List<ExprNodeDesc>> keyExprMap = new HashMap<Byte, List<ExprNodeDesc>>();
-    Map<Byte, List<ExprNodeDesc>> valueExprMap = new HashMap<Byte, List<ExprNodeDesc>>();
 
     // Walk over all the sources (which are guaranteed to be reduce sink
     // operators).
@@ -347,7 +346,6 @@ public class MapJoinProcessor implements Transform {
       new ArrayList<Operator<? extends OperatorDesc>>();
     List<Operator<? extends OperatorDesc>> oldReduceSinkParentOps =
        new ArrayList<Operator<? extends OperatorDesc>>();
-    Map<String, ExprNodeDesc> colExprMap = new HashMap<String, ExprNodeDesc>();
 
     // found a source which is not to be stored in memory
     if (leftSrc != null) {
@@ -383,37 +381,34 @@ public class MapJoinProcessor implements Transform {
       keyExprMap.put(pos, keys);
     }
 
-    // create the map-join operator
-    for (pos = 0; pos < newParentOps.size(); pos++) {
-      RowResolver inputRS = opParseCtxMap.get(newParentOps.get(pos)).getRowResolver();
-      List<ExprNodeDesc> values = new ArrayList<ExprNodeDesc>();
+    // removing RS, only ExprNodeDesc is changed (key/value/filter exprs and colExprMap)
+    // others (output column-name, RR, schema) remain intact
+    Map<String, ExprNodeDesc> colExprMap = op.getColumnExprMap();
+    List<String> outputColumnNames = op.getConf().getOutputColumnNames();
 
-      Iterator<String> keysIter = inputRS.getTableNames().iterator();
-      while (keysIter.hasNext()) {
-        String key = keysIter.next();
-        HashMap<String, ColumnInfo> rrMap = inputRS.getFieldMap(key);
-        Iterator<String> fNamesIter = rrMap.keySet().iterator();
-        while (fNamesIter.hasNext()) {
-          String field = fNamesIter.next();
-          ColumnInfo valueInfo = inputRS.get(key, field);
-          ColumnInfo oldValueInfo = oldOutputRS.get(key, field);
-          if (oldValueInfo == null) {
-            continue;
-          }
-          String outputCol = oldValueInfo.getInternalName();
-          if (outputRS.get(key, field) == null) {
-            outputColumnNames.add(outputCol);
-            ExprNodeDesc colDesc = new ExprNodeColumnDesc(valueInfo.getType(), valueInfo
-                .getInternalName(), valueInfo.getTabAlias(), valueInfo.getIsVirtualCol());
-            values.add(colDesc);
-            outputRS.put(key, field, new ColumnInfo(outputCol, valueInfo.getType(), valueInfo
-                .getTabAlias(), valueInfo.getIsVirtualCol(), valueInfo.isHiddenVirtualCol()));
-            colExprMap.put(outputCol, colDesc);
-          }
+    List<ColumnInfo> schema = new ArrayList<ColumnInfo>(op.getSchema().getSignature());
+
+    Map<Byte, List<ExprNodeDesc>> valueExprs = op.getConf().getExprs();
+    Map<Byte, List<ExprNodeDesc>> newValueExprs = new HashMap<Byte, List<ExprNodeDesc>>();
+    for (Map.Entry<Byte, List<ExprNodeDesc>> entry : valueExprs.entrySet()) {
+      byte tag = entry.getKey();
+      Operator<?> terminal = oldReduceSinkParentOps.get(tag);
+
+      List<ExprNodeDesc> values = entry.getValue();
+      List<ExprNodeDesc> newValues = ExprNodeDescUtils.backtrack(values, op, terminal);
+      newValueExprs.put(tag, newValues);
+      for (int i = 0; i < schema.size(); i++) {
+        ColumnInfo column = schema.get(i);
+        if (column == null) {
+          continue;
+        }
+        ExprNodeDesc expr = colExprMap.get(column.getInternalName());
+        int index = ExprNodeDescUtils.indexOf(expr, values);
+        if (index >= 0) {
+          colExprMap.put(column.getInternalName(), newValues.get(index));
+          schema.set(i, null);
         }
       }
-
-      valueExprMap.put(Byte.valueOf((byte) pos), values);
     }
 
     Map<Byte, List<ExprNodeDesc>> filters = desc.getFilters();
@@ -454,7 +449,7 @@ public class MapJoinProcessor implements Transform {
 
     int[][] filterMap = desc.getFilterMap();
     for (pos = 0; pos < newParentOps.size(); pos++) {
-      List<ExprNodeDesc> valueCols = valueExprMap.get(Byte.valueOf((byte) pos));
+      List<ExprNodeDesc> valueCols = newValueExprs.get(pos);
       int length = valueCols.size();
       List<ExprNodeDesc> valueFilteredCols = new ArrayList<ExprNodeDesc>(length);
       // deep copy expr node desc
@@ -490,7 +485,7 @@ public class MapJoinProcessor implements Transform {
     } else {
       dumpFilePrefix = "mapfile"+PlanUtils.getCountForMapJoinDumpFilePrefix();
     }
-    MapJoinDesc mapJoinDescriptor = new MapJoinDesc(keyExprMap, keyTableDesc, valueExprMap,
+    MapJoinDesc mapJoinDescriptor = new MapJoinDesc(keyExprMap, keyTableDesc, newValueExprs,
         valueTableDescs, valueFiltedTableDescs, outputColumnNames, mapJoinPos, joinCondns,
         filters, op.getConf().getNoOuterJoin(), dumpFilePrefix);
     mapJoinDescriptor.setTagOrder(tagOrder);
@@ -620,10 +615,10 @@ public class MapJoinProcessor implements Transform {
    *
    *
    * @param condns
-   * @return list of big table candidates
+   * @return set of big table candidates
    */
-  public static HashSet<Integer> getBigTableCandidates(JoinCondDesc[] condns) {
-    HashSet<Integer> bigTableCandidates = new HashSet<Integer>();
+  public static Set<Integer> getBigTableCandidates(JoinCondDesc[] condns) {
+    Set<Integer> bigTableCandidates = new HashSet<Integer>();
 
     boolean seenOuterJoin = false;
     Set<Integer> seenPostitions = new HashSet<Integer>();
@@ -677,13 +672,20 @@ public class MapJoinProcessor implements Transform {
     return bigTableCandidates;
   }
 
-  public static void checkMapJoin(int mapJoinPos, JoinCondDesc[] condns) throws SemanticException {
-    HashSet<Integer> bigTableCandidates = MapJoinProcessor.getBigTableCandidates(condns);
+  /**
+   * @param mapJoinPos the position of big table as determined by either hints or auto conversion.
+   * @param condns the join conditions
+   * @return if given mapjoin position is a feasible big table position return same else -1.
+   * @throws SemanticException if given position is not in the big table candidates.
+   */
+  public static int checkMapJoin(int mapJoinPos, JoinCondDesc[] condns) {
+    Set<Integer> bigTableCandidates = MapJoinProcessor.getBigTableCandidates(condns);
 
-    if (bigTableCandidates == null || !bigTableCandidates.contains(mapJoinPos)) {
-      throw new SemanticException(ErrorMsg.NO_OUTER_MAPJOIN.getMsg());
+    // bigTableCandidates can never be null
+    if (!bigTableCandidates.contains(mapJoinPos)) {
+      return -1;
     }
-    return;
+    return mapJoinPos;
   }
 
   private void genSelectPlan(ParseContext pctx, MapJoinOperator input) throws SemanticException {

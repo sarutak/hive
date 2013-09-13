@@ -84,6 +84,7 @@ import org.apache.hadoop.hive.ql.plan.DDLWork;
 import org.apache.hadoop.hive.ql.plan.FetchWork;
 import org.apache.hadoop.hive.ql.plan.LoadFileDesc;
 import org.apache.hadoop.hive.ql.plan.LoadTableDesc;
+import org.apache.hadoop.hive.ql.plan.MapWork;
 import org.apache.hadoop.hive.ql.plan.MapredWork;
 import org.apache.hadoop.hive.ql.plan.MoveWork;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
@@ -136,14 +137,22 @@ public class MapReduceCompiler {
       if ((!loadTableWork.isEmpty()) || (loadFileWork.size() != 1)) {
         throw new SemanticException(ErrorMsg.GENERIC_ERROR.getMsg());
       }
-      String cols = loadFileWork.get(0).getColumns();
-      String colTypes = loadFileWork.get(0).getColumnTypes();
 
-      String resFileFormat = HiveConf.getVar(conf, HiveConf.ConfVars.HIVEQUERYRESULTFILEFORMAT);
-      TableDesc resultTab = PlanUtils.getDefaultQueryOutputTableDesc(cols, colTypes, resFileFormat);
+      LoadFileDesc loadFileDesc = loadFileWork.get(0);
 
-      FetchWork fetch = new FetchWork(new Path(loadFileWork.get(0).getSourceDir()).toString(),
+      String cols = loadFileDesc.getColumns();
+      String colTypes = loadFileDesc.getColumnTypes();
+
+      TableDesc resultTab = pCtx.getFetchTabledesc();
+      if (resultTab == null) {
+        String resFileFormat = HiveConf.getVar(conf, HiveConf.ConfVars.HIVEQUERYRESULTFILEFORMAT);
+        resultTab = PlanUtils.getDefaultQueryOutputTableDesc(cols, colTypes, resFileFormat);
+      }
+
+      FetchWork fetch = new FetchWork(new Path(loadFileDesc.getSourceDir()).toString(),
           resultTab, qb.getParseInfo().getOuterQueryLimit());
+      fetch.setSource(pCtx.getFetchSource());
+      fetch.setSink(pCtx.getFetchSink());
 
       pCtx.setFetchTask((FetchTask) TaskFactory.get(fetch, conf));
 
@@ -349,7 +358,7 @@ public class MapReduceCompiler {
     }
   }
 
-  private void setInputFormat(MapredWork work, Operator<? extends OperatorDesc> op) {
+  private void setInputFormat(MapWork work, Operator<? extends OperatorDesc> op) {
     if (op.isUseBucketizedHiveInputFormat()) {
       work.setUseBucketizedHiveInputFormat(true);
       return;
@@ -365,7 +374,7 @@ public class MapReduceCompiler {
   // loop over all the tasks recursively
   private void setInputFormat(Task<? extends Serializable> task) {
     if (task instanceof ExecDriver) {
-      MapredWork work = (MapredWork) task.getWork();
+      MapWork work = ((MapredWork) task.getWork()).getMapWork();
       HashMap<String, Operator<? extends OperatorDesc>> opMap = work.getAliasToWork();
       if (!opMap.isEmpty()) {
         for (Operator<? extends OperatorDesc> op : opMap.values()) {
@@ -391,16 +400,16 @@ public class MapReduceCompiler {
   private void generateCountersTask(Task<? extends Serializable> task) {
     if (task instanceof ExecDriver) {
       HashMap<String, Operator<? extends OperatorDesc>> opMap = ((MapredWork) task
-          .getWork()).getAliasToWork();
+          .getWork()).getMapWork().getAliasToWork();
       if (!opMap.isEmpty()) {
         for (Operator<? extends OperatorDesc> op : opMap.values()) {
           generateCountersOperator(op);
         }
       }
 
-      Operator<? extends OperatorDesc> reducer = ((MapredWork) task.getWork())
-          .getReducer();
-      if (reducer != null) {
+      if (((MapredWork)task.getWork()).getReduceWork() != null) {
+        Operator<? extends OperatorDesc> reducer = ((MapredWork) task.getWork()).getReduceWork()
+            .getReducer();
         LOG.info("Generating counters for operator " + reducer);
         generateCountersOperator(reducer);
       }
@@ -440,7 +449,8 @@ public class MapReduceCompiler {
     return new ParseContext(conf, pCtx.getQB(), pCtx.getParseTree(),
         pCtx.getOpToPartPruner(), pCtx.getOpToPartList(), pCtx.getTopOps(),
         pCtx.getTopSelOps(), pCtx.getOpParseCtx(), pCtx.getJoinContext(),
-        pCtx.getSmbMapJoinContext(), pCtx.getTopToTable(), pCtx.getFsopToTable(),
+        pCtx.getSmbMapJoinContext(), pCtx.getTopToTable(), pCtx.getTopToProps(),
+        pCtx.getFsopToTable(),
         pCtx.getLoadTableWork(), pCtx.getLoadFileWork(), pCtx.getContext(),
         pCtx.getIdToTableNameMap(), pCtx.getDestTableId(), pCtx.getUCtx(),
         pCtx.getListMapJoinOpsNoReducer(), pCtx.getGroupOpToInputTables(),
@@ -456,7 +466,7 @@ public class MapReduceCompiler {
 
     if (task instanceof ExecDriver) {
       HashMap<String, Operator<? extends OperatorDesc>> opMap = ((MapredWork) task
-          .getWork()).getAliasToWork();
+          .getWork()).getMapWork().getAliasToWork();
       if (!opMap.isEmpty()) {
         for (Operator<? extends OperatorDesc> op : opMap.values()) {
           breakOperatorTree(op);
@@ -559,12 +569,12 @@ public class MapReduceCompiler {
    * Make a best guess at trying to find the number of reducers
    */
   private static int getNumberOfReducers(MapredWork mrwork, HiveConf conf) {
-    if (mrwork.getReducer() == null) {
+    if (mrwork.getReduceWork() == null) {
       return 0;
     }
 
-    if (mrwork.getNumReduceTasks() >= 0) {
-      return mrwork.getNumReduceTasks();
+    if (mrwork.getReduceWork().getNumReduceTasks() >= 0) {
+      return mrwork.getReduceWork().getNumReduceTasks();
     }
 
     return conf.getIntVar(HiveConf.ConfVars.HADOOPNUMREDUCERS);
@@ -598,7 +608,8 @@ public class MapReduceCompiler {
     boolean hasNonLocalJob = false;
     for (ExecDriver mrtask : mrtasks) {
       try {
-        ContentSummary inputSummary = Utilities.getInputSummary(ctx, mrtask.getWork(), p);
+        ContentSummary inputSummary = Utilities.getInputSummary
+            (ctx, ((MapredWork) mrtask.getWork()).getMapWork(), p);
         int numReducers = getNumberOfReducers(mrtask.getWork(), conf);
 
         long estimatedInput;

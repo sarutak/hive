@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hive.ql.plan;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -33,11 +34,12 @@ import org.apache.hadoop.hive.conf.HiveConf;
 import org.apache.hadoop.hive.metastore.MetaStoreUtils;
 import org.apache.hadoop.hive.metastore.api.FieldSchema;
 import org.apache.hadoop.hive.ql.exec.ColumnInfo;
-import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.RowSchema;
 import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.ql.hooks.ReadEntity;
+import org.apache.hadoop.hive.ql.io.HiveFileFormatUtils;
 import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
+import org.apache.hadoop.hive.ql.io.HivePassThroughOutputFormat;
 import org.apache.hadoop.hive.ql.io.IgnoreKeyTextOutputFormat;
 import org.apache.hadoop.hive.ql.io.RCFileInputFormat;
 import org.apache.hadoop.hive.ql.io.RCFileOutputFormat;
@@ -89,12 +91,10 @@ public final class PlanUtils {
   @SuppressWarnings("nls")
   public static MapredWork getMapRedWork() {
     try {
-      return new MapredWork("", new LinkedHashMap<String, ArrayList<String>>(),
-        new LinkedHashMap<String, PartitionDesc>(),
-        new LinkedHashMap<String, Operator<? extends OperatorDesc>>(),
-        new TableDesc(), new ArrayList<TableDesc>(), null, Integer.valueOf(1),
-        null, Hive.get().getConf().getBoolVar(
+      MapredWork work = new MapredWork();
+      work.getMapWork().setHadoopSupportsSplittable(Hive.get().getConf().getBoolVar(
           HiveConf.ConfVars.HIVE_COMBINE_INPUT_FORMAT_SUPPORTS_SPLITTABLE));
+      return work;
     } catch (HiveException ex) {
       throw new RuntimeException(ex);
     }
@@ -776,6 +776,10 @@ public final class PlanUtils {
         // for native tables, leave it null to avoid cluttering up
         // plans.
         if (!jobProperties.isEmpty()) {
+          if (tableDesc.getOutputFileFormatClass().getName() == HivePassThroughOutputFormat.HIVE_PASSTHROUGH_OF_CLASSNAME) {
+            // get the real output format when we register this for the table
+            jobProperties.put(HivePassThroughOutputFormat.HIVE_PASSTHROUGH_STORAGEHANDLER_OF_JOBCONFKEY,HiveFileFormatUtils.getRealOutputFormatClassName());
+          }
           tableDesc.setJobProperties(jobProperties);
         }
       }

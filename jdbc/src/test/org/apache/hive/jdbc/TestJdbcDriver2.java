@@ -31,8 +31,9 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Types;
+import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -42,7 +43,12 @@ import junit.framework.TestCase;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.conf.HiveConf;
+import org.apache.hadoop.hive.metastore.TableType;
 import org.apache.hive.common.util.HiveVersionInfo;
+import org.apache.hive.service.cli.operation.ClassicTableTypeMapping;
+import org.apache.hive.service.cli.operation.ClassicTableTypeMapping.ClassicTableTypes;
+import org.apache.hive.service.cli.operation.HiveTableTypeMapping;
+import org.apache.hive.service.cli.operation.TableTypeMappingFactory.TableTypeMappings;
 
 
 /**
@@ -150,7 +156,8 @@ public class TestJdbcDriver2 extends TestCase {
         + " c16 array<struct<m:map<string,string>,n:int>>,"
         + " c17 timestamp, "
         + " c18 decimal, "
-        + " c19 binary) comment'" + dataTypeTableComment
+        + " c19 binary, "
+        + " c20 date) comment'" + dataTypeTableComment
             +"' partitioned by (dt STRING)");
 
     stmt.execute("load data local inpath '"
@@ -278,6 +285,7 @@ public class TestJdbcDriver2 extends TestCase {
         + tableName
         + " where   'not?param?not?param' <> 'not_param??not_param' and ?=? "
         + " and 1=? and 2=? and 3.0=? and 4.0=? and 'test\\'string\"'=? and 5=? and ?=? "
+        + " and date '2012-01-01' = date ?"
         + " ) t  select '2011-03-25' ddate,'China',true bv, 10 num limit 10";
 
      ///////////////////////////////////////////////
@@ -297,6 +305,7 @@ public class TestJdbcDriver2 extends TestCase {
       ps.setLong(8, 5L);
       ps.setByte(9, (byte) 1);
       ps.setByte(10, (byte) 1);
+      ps.setString(11, "2012-01-01");
 
       ps.setMaxRows(2);
 
@@ -381,6 +390,46 @@ public class TestJdbcDriver2 extends TestCase {
         expectedException);
   }
 
+  /**
+   * Execute non-select statements using execute() and executeUpdated() APIs
+   * of PreparedStatement interface
+   * @throws Exception
+   */
+  public void testExecutePreparedStatement() throws Exception {
+    String key = "testKey";
+    String val1 = "val1";
+    String val2 = "val2";
+    PreparedStatement ps = con.prepareStatement("set " + key + " = ?");
+
+    // execute() of Prepared statement
+    ps.setString(1, val1);
+    ps.execute();
+    verifyConfValue(key, val1);
+
+    // executeUpdate() of Prepared statement
+    ps.clearParameters();
+    ps.setString(1, val2);
+    ps.executeUpdate();
+    verifyConfValue(key, val2);
+  }
+
+  /**
+   * Execute "set x" and extract value from key=val format result
+   * Verify the extracted value
+   * @param stmt
+   * @return
+   * @throws Exception
+   */
+  private void verifyConfValue(String key, String expectedVal) throws Exception {
+    Statement stmt = con.createStatement();
+    ResultSet res = stmt.executeQuery("set " + key);
+    assertTrue(res.next());
+    String resultValues[] = res.getString(1).split("="); // "key = 'val'"
+    assertEquals("Result not in key = val format", 2, resultValues.length);
+    String result = resultValues[1].substring(1, resultValues[1].length() -1); // remove '
+    assertEquals("Conf value should be set by execute()", expectedVal, result);
+  }
+
   public final void testSelectAll() throws Exception {
     doTestSelectAll(tableName, -1, -1); // tests not setting maxRows (return all)
     doTestSelectAll(tableName, 0, -1); // tests setting maxRows to 0 (return all)
@@ -410,6 +459,85 @@ public class TestJdbcDriver2 extends TestCase {
     } finally {
       stmt.close();
     }
+  }
+
+  // executeQuery should always throw a SQLException,
+  // when it executes a non-ResultSet query (like create)
+  public void testExecuteQueryException() throws Exception {
+    Statement stmt = con.createStatement();
+    try {
+      stmt.executeQuery("create table test_t2 (under_col int, value string)");
+      fail("Expecting SQLException");
+    }
+    catch (SQLException e) {
+      System.out.println("Caught an expected SQLException: " + e.getMessage());
+    }
+    finally {
+      stmt.close();
+    }
+  }
+
+  private void checkResultSetExpected(Statement stmt, List<String> setupQueries, String testQuery,
+      boolean isExpectedResultSet) throws Exception {
+    boolean hasResultSet;
+    // execute the setup queries
+    for(String setupQuery: setupQueries) {
+      try {
+        stmt.execute(setupQuery);
+      } catch (Exception e) {
+        failWithExceptionMsg(e);
+      }
+    }
+    // execute the test query
+    try {
+      hasResultSet = stmt.execute(testQuery);
+      assertEquals(hasResultSet, isExpectedResultSet);
+    }
+    catch(Exception e) {
+      failWithExceptionMsg(e);
+    }
+  }
+
+  private void failWithExceptionMsg(Exception e) {
+    e.printStackTrace();
+    fail(e.toString());
+  }
+
+  public void testNullResultSet() throws Exception {
+    List<String> setupQueries = new ArrayList<String>();
+    String testQuery;
+    boolean hasResultSet;
+    Statement stmt = con.createStatement();
+
+    // -select- should return a ResultSet
+    try {
+      stmt.executeQuery("select * from " + tableName);
+      System.out.println("select: success");
+    }
+    catch(SQLException e) {
+      failWithExceptionMsg(e);
+    }
+
+    // -create- should not return a ResultSet
+    setupQueries.add("drop table test_t1");
+    testQuery = "create table test_t1 (under_col int, value string)";
+    checkResultSetExpected(stmt, setupQueries, testQuery, false);
+    setupQueries.clear();
+
+    // -create table as select- should not return a ResultSet
+    setupQueries.add("drop table test_t1");
+    testQuery = "create table test_t1 as select * from " + tableName;
+    checkResultSetExpected(stmt, setupQueries, testQuery, false);
+    setupQueries.clear();
+
+    // -insert table as select- should not return a ResultSet
+    setupQueries.add("drop table test_t1");
+    setupQueries.add("create table test_t1 (under_col int, value string)");
+    testQuery = "insert into table test_t1 select under_col, value from "  + tableName;
+    checkResultSetExpected(stmt, setupQueries, testQuery, false);
+    setupQueries.clear();
+
+    stmt.close();
   }
 
   public void testDataTypes() throws Exception {
@@ -445,6 +573,8 @@ public class TestJdbcDriver2 extends TestCase {
     assertEquals(null, res.getString(17));
     assertEquals(null, res.getString(18));
     assertEquals(null, res.getString(19));
+    assertEquals(null, res.getString(20));
+    assertEquals(null, res.getDate(20));
 
     // row 2
     assertTrue(res.next());
@@ -468,6 +598,8 @@ public class TestJdbcDriver2 extends TestCase {
     assertEquals(null, res.getTimestamp(17));
     assertEquals(null, res.getBigDecimal(18));
     assertEquals(null, res.getString(19));
+    assertEquals(null, res.getString(20));
+    assertEquals(null, res.getDate(20));
 
     // row 3
     assertTrue(res.next());
@@ -491,6 +623,8 @@ public class TestJdbcDriver2 extends TestCase {
     assertEquals("2012-04-22 09:00:00.123456789", res.getTimestamp(17).toString());
     assertEquals("123456789.0123456", res.getBigDecimal(18).toString());
     assertEquals("abcd", res.getString(19));
+    assertEquals("2013-01-01", res.getString(20));
+    assertEquals("2013-01-01", res.getDate(20).toString());
 
     // test getBoolean rules on non-boolean columns
     assertEquals(true, res.getBoolean(1));
@@ -655,6 +789,32 @@ public class TestJdbcDriver2 extends TestCase {
   }
 
   public void testMetaDataGetTables() throws SQLException {
+    getTablesTest(ClassicTableTypes.TABLE.toString(), ClassicTableTypes.VIEW.toString());
+  }
+
+  public  void testMetaDataGetTablesHive() throws SQLException {
+    Statement stmt = con.createStatement();
+    stmt.execute("set " + HiveConf.ConfVars.HIVE_SERVER2_TABLE_TYPE_MAPPING.varname +
+        " = " + TableTypeMappings.HIVE.toString());
+    getTablesTest(TableType.MANAGED_TABLE.toString(), TableType.VIRTUAL_VIEW.toString());
+  }
+
+  public  void testMetaDataGetTablesClassic() throws SQLException {
+    Statement stmt = con.createStatement();
+    stmt.execute("set " + HiveConf.ConfVars.HIVE_SERVER2_TABLE_TYPE_MAPPING.varname +
+        " = " + TableTypeMappings.CLASSIC.toString());
+    stmt.close();
+    getTablesTest(ClassicTableTypes.TABLE.toString(), ClassicTableTypes.VIEW.toString());
+  }
+
+  /**
+   * Test the type returned for pre-created table type table and view type
+   * table
+   * @param tableTypeName expected table type
+   * @param viewTypeName expected view type
+   * @throws SQLException
+   */
+  private void getTablesTest(String tableTypeName, String viewTypeName) throws SQLException {
     Map<String, Object[]> tests = new HashMap<String, Object[]>();
     tests.put("test%jdbc%", new Object[]{"testhivejdbcdriver_table"
             , "testhivejdbcdriverpartitionedtable"
@@ -689,7 +849,9 @@ public class TestJdbcDriver2 extends TestCase {
         assertTrue("Missing comment on the table.", resultTableComment.length()>0);
         String tableType = rs.getString("TABLE_TYPE");
         if (resultTableName.endsWith("view")) {
-          assertEquals("Expected a tabletype view but got something else.", "VIRTUAL_VIEW", tableType);
+          assertEquals("Expected a tabletype view but got something else.", viewTypeName, tableType);
+        } else {
+          assertEquals("Expected a tabletype table but got something else.", tableTypeName, tableType);
         }
         cnt++;
       }
@@ -699,7 +861,7 @@ public class TestJdbcDriver2 extends TestCase {
 
     // only ask for the views.
     ResultSet rs = (ResultSet)con.getMetaData().getTables("default", null, null
-            , new String[]{"VIRTUAL_VIEW"});
+            , new String[]{viewTypeName});
     int cnt=0;
     while (rs.next()) {
       cnt++;
@@ -732,14 +894,41 @@ public class TestJdbcDriver2 extends TestCase {
     rs.close();
   }
 
+  //test default table types returned in
+  // Connection.getMetaData().getTableTypes()
   public void testMetaDataGetTableTypes() throws SQLException {
-    ResultSet rs = (ResultSet)con.getMetaData().getTableTypes();
+    metaDataGetTableTypeTest(new ClassicTableTypeMapping().getTableTypeNames());
+  }
 
-    Set<String> tabletypes = new HashSet();
-    tabletypes.add("MANAGED_TABLE");
-    tabletypes.add("EXTERNAL_TABLE");
-    tabletypes.add("VIRTUAL_VIEW");
-    tabletypes.add("INDEX_TABLE");
+  //test default table types returned in
+  // Connection.getMetaData().getTableTypes() when type config is set to "HIVE"
+  public void testMetaDataGetHiveTableTypes() throws SQLException {
+    Statement stmt = con.createStatement();
+    stmt.execute("set " + HiveConf.ConfVars.HIVE_SERVER2_TABLE_TYPE_MAPPING.varname +
+        " = " + TableTypeMappings.HIVE.toString());
+    stmt.close();
+    metaDataGetTableTypeTest(new HiveTableTypeMapping().getTableTypeNames());
+  }
+
+  //test default table types returned in
+  // Connection.getMetaData().getTableTypes() when type config is set to "CLASSIC"
+  public void testMetaDataGetClassicTableTypes() throws SQLException {
+    Statement stmt = con.createStatement();
+    stmt.execute("set " + HiveConf.ConfVars.HIVE_SERVER2_TABLE_TYPE_MAPPING.varname +
+        " = " + TableTypeMappings.CLASSIC.toString());
+    stmt.close();
+    metaDataGetTableTypeTest(new ClassicTableTypeMapping().getTableTypeNames());
+  }
+
+  /**
+   * Test if Connection.getMetaData().getTableTypes() returns expected
+   *  tabletypes
+   * @param tabletypes expected table types
+   * @throws SQLException
+   */
+  private void metaDataGetTableTypeTest(Set<String> tabletypes)
+      throws SQLException {
+    ResultSet rs = (ResultSet)con.getMetaData().getTableTypes();
 
     int cnt = 0;
     while (rs.next()) {
@@ -899,13 +1088,14 @@ public class TestJdbcDriver2 extends TestCase {
 
     ResultSet res = stmt.executeQuery(
         "select c1, c2, c3, c4, c5 as a, c6, c7, c8, c9, c10, c11, c12, " +
-        "c1*2, sentences(null, null, null) as b, c17, c18 from " + dataTypeTableName + " limit 1");
+        "c1*2, sentences(null, null, null) as b, c17, c18, c20 from " + dataTypeTableName +
+        " limit 1");
     ResultSetMetaData meta = res.getMetaData();
 
     ResultSet colRS = con.getMetaData().getColumns(null, null,
         dataTypeTableName.toLowerCase(), null);
 
-    assertEquals(16, meta.getColumnCount());
+    assertEquals(17, meta.getColumnCount());
 
     assertTrue(colRS.next());
 
@@ -1105,6 +1295,13 @@ public class TestJdbcDriver2 extends TestCase {
     assertEquals(Integer.MAX_VALUE, meta.getColumnDisplaySize(16));
     assertEquals(Integer.MAX_VALUE, meta.getPrecision(16));
     assertEquals(Integer.MAX_VALUE, meta.getScale(16));
+
+    assertEquals("c20", meta.getColumnName(17));
+    assertEquals(Types.DATE, meta.getColumnType(17));
+    assertEquals("date", meta.getColumnTypeName(17));
+    assertEquals(10, meta.getColumnDisplaySize(17));
+    assertEquals(10, meta.getPrecision(17));
+    assertEquals(0, meta.getScale(17));
 
     for (int i = 1; i <= meta.getColumnCount(); i++) {
       assertFalse(meta.isAutoIncrement(i));

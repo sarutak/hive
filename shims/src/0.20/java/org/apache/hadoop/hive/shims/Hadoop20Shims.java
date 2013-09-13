@@ -30,6 +30,7 @@ import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
@@ -37,6 +38,7 @@ import javax.security.auth.Subject;
 import javax.security.auth.login.LoginException;
 
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -63,7 +65,9 @@ import org.apache.hadoop.mapred.TaskID;
 import org.apache.hadoop.mapred.TaskLogServlet;
 import org.apache.hadoop.mapred.lib.CombineFileInputFormat;
 import org.apache.hadoop.mapred.lib.CombineFileSplit;
+import org.apache.hadoop.mapred.lib.TotalOrderPartitioner;
 import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.JobID;
 import org.apache.hadoop.mapreduce.TaskAttemptID;
 import org.apache.hadoop.security.SecurityUtil;
 import org.apache.hadoop.security.UnixUserGroupInformation;
@@ -71,11 +75,13 @@ import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.tools.HadoopArchives;
 import org.apache.hadoop.util.Progressable;
 import org.apache.hadoop.util.ToolRunner;
+import org.apache.hadoop.util.VersionInfo;
 
 /**
  * Implemention of shims against Hadoop 0.20.0.
  */
 public class Hadoop20Shims implements HadoopShims {
+
   public boolean usesJobShell() {
     return false;
   }
@@ -191,6 +197,10 @@ public class Hadoop20Shims implements HadoopShims {
         throw new IOException("CombineFileInputFormat.getRecordReader not needed.");
       }
     };
+  }
+
+  public void setTotalOrderPartitionFile(JobConf jobConf, Path partitionFile){
+    TotalOrderPartitioner.setPartitionFile(jobConf, partitionFile);
   }
 
   public static class InputSplitShim extends CombineFileSplit implements HadoopShims.InputSplitShim {
@@ -594,18 +604,65 @@ public class Hadoop20Shims implements HadoopShims {
   }
 
   @Override
+  public Path createDelegationTokenFile(Configuration conf) throws IOException {
+    throw new UnsupportedOperationException("Tokens are not supported in current hadoop version");
+  }
+
+  @Override
   public UserGroupInformation createRemoteUser(String userName, List<String> groupNames) {
     return new UnixUserGroupInformation(userName, groupNames.toArray(new String[0]));
   }
 
   @Override
   public void loginUserFromKeytab(String principal, String keytabFile) throws IOException {
-    throw new UnsupportedOperationException("Kerberos login is not supported in current hadoop version");
+    throwKerberosUnsupportedError();
+  }
+
+  @Override
+  public void reLoginUserFromKeytab() throws IOException{
+    throwKerberosUnsupportedError();
+  }
+
+  private void throwKerberosUnsupportedError() throws UnsupportedOperationException{
+    throw new UnsupportedOperationException("Kerberos login is not supported" +
+        " in this hadoop version (" + VersionInfo.getVersion() + ")");
   }
 
   @Override
   public UserGroupInformation createProxyUser(String userName) throws IOException {
     return createRemoteUser(userName, null);
+  }
+
+  @Override
+  public Iterator<FileStatus> listLocatedStatus(final FileSystem fs,
+                                                final Path path,
+                                                final PathFilter filter
+                                               ) throws IOException {
+    return new Iterator<FileStatus>() {
+      private final FileStatus[] result = fs.listStatus(path, filter);
+      private int current = 0;
+
+      @Override
+      public boolean hasNext() {
+        return current < result.length;
+      }
+
+      @Override
+      public FileStatus next() {
+        return result[current++];
+      }
+
+      @Override
+      public void remove() {
+        throw new IllegalArgumentException("Not supported");
+      }
+    };
+  }
+
+  @Override
+  public BlockLocation[] getLocations(FileSystem fs,
+                                      FileStatus status) throws IOException {
+    return fs.getFileBlockLocations(status, 0, status.getLen());
   }
 
   @Override
@@ -652,6 +709,11 @@ public class Hadoop20Shims implements HadoopShims {
         progressable.progress();
       }
     };
+  }
+
+  @Override
+  public TaskAttemptID newTaskAttemptID(JobID jobId, boolean isMap, int taskId, int id) {
+    return new TaskAttemptID(jobId.getJtIdentifier(), jobId.getId(), isMap, taskId, id);
   }
 
   @Override
@@ -706,5 +768,19 @@ public class Hadoop20Shims implements HadoopShims {
   @Override
   public short getDefaultReplication(FileSystem fs, Path path) {
     return fs.getDefaultReplication();
+  }
+
+  @Override
+  public String getTokenFileLocEnvName() {
+    throw new UnsupportedOperationException(
+        "Kerberos not supported in current hadoop version");
+  }
+  @Override
+  public HCatHadoopShims getHCatShim() {
+      throw new UnsupportedOperationException("HCatalog does not support Hadoop 0.20.x");
+  }
+  @Override
+  public WebHCatJTShim getWebHCatShim(Configuration conf, UserGroupInformation ugi) throws IOException {
+      throw new UnsupportedOperationException("WebHCat does not support Hadoop 0.20.x");
   }
 }

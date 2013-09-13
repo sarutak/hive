@@ -53,7 +53,6 @@ import org.apache.hadoop.hive.metastore.api.Order;
 import org.apache.hadoop.hive.metastore.api.Partition;
 import org.apache.hadoop.hive.metastore.api.SerDeInfo;
 import org.apache.hadoop.hive.metastore.api.SkewedInfo;
-import org.apache.hadoop.hive.metastore.api.SkewedValueList;
 import org.apache.hadoop.hive.metastore.api.StorageDescriptor;
 import org.apache.hadoop.hive.metastore.api.StringColumnStatsData;
 import org.apache.hadoop.hive.metastore.api.Table;
@@ -63,6 +62,8 @@ import org.apache.hadoop.hive.ql.exec.Utilities;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.util.StringUtils;
 import org.apache.thrift.TException;
+
+import com.google.common.collect.Lists;
 
 public abstract class TestHiveMetaStore extends TestCase {
   protected static HiveMetaStoreClient client;
@@ -186,8 +187,8 @@ public abstract class TestHiveMetaStore extends TestCase {
       skewInfor.setSkewedColNames(Arrays.asList("name"));
       List<String> skv = Arrays.asList("1");
       skewInfor.setSkewedColValues(Arrays.asList(skv));
-      Map<SkewedValueList, String> scvlm = new HashMap<SkewedValueList, String>();
-      scvlm.put(new SkewedValueList(skv), "location1");
+      Map<List<String>, String> scvlm = new HashMap<List<String>, String>();
+      scvlm.put(skv, "location1");
       skewInfor.setSkewedColValueLocationMaps(scvlm);
       sd.setSkewedInfo(skewInfor);
 
@@ -1919,31 +1920,6 @@ public abstract class TestHiveMetaStore extends TestCase {
     String dbName = "filterdb";
     String tblName = "filtertbl";
 
-    List<String> vals = new ArrayList<String>(3);
-    vals.add("p11");
-    vals.add("p21");
-    vals.add("p31");
-    List <String> vals2 = new ArrayList<String>(3);
-    vals2.add("p11");
-    vals2.add("p22");
-    vals2.add("p31");
-    List <String> vals3 = new ArrayList<String>(3);
-    vals3.add("p12");
-    vals3.add("p21");
-    vals3.add("p31");
-    List <String> vals4 = new ArrayList<String>(3);
-    vals4.add("p12");
-    vals4.add("p23");
-    vals4.add("p31");
-    List <String> vals5 = new ArrayList<String>(3);
-    vals5.add("p13");
-    vals5.add("p24");
-    vals5.add("p31");
-    List <String> vals6 = new ArrayList<String>(3);
-    vals6.add("p13");
-    vals6.add("p25");
-    vals6.add("p31");
-
     silentDropDatabase(dbName);
 
     Database db = new Database();
@@ -1981,21 +1957,49 @@ public abstract class TestHiveMetaStore extends TestCase {
 
     tbl = client.getTable(dbName, tblName);
 
-    add_partition(client, tbl, vals, "part1");
-    add_partition(client, tbl, vals2, "part2");
-    add_partition(client, tbl, vals3, "part3");
-    add_partition(client, tbl, vals4, "part4");
-    add_partition(client, tbl, vals5, "part5");
-    add_partition(client, tbl, vals6, "part6");
+    add_partition(client, tbl, Lists.newArrayList("p11", "p21", "31"), "part1");
+    add_partition(client, tbl, Lists.newArrayList("p11", "p22", "32"), "part2");
+    add_partition(client, tbl, Lists.newArrayList("p12", "p21", "31"), "part3");
+    add_partition(client, tbl, Lists.newArrayList("p12", "p23", "32"), "part4");
+    add_partition(client, tbl, Lists.newArrayList("p13", "p24", "31"), "part5");
+    add_partition(client, tbl, Lists.newArrayList("p13", "p25", "-33"), "part6");
 
+    // Test equals operator for strings and integers.
     checkFilter(client, dbName, tblName, "p1 = \"p11\"", 2);
     checkFilter(client, dbName, tblName, "p1 = \"p12\"", 2);
     checkFilter(client, dbName, tblName, "p2 = \"p21\"", 2);
     checkFilter(client, dbName, tblName, "p2 = \"p23\"", 1);
+    checkFilter(client, dbName, tblName, "p3 = 31", 3);
+    checkFilter(client, dbName, tblName, "p3 = 33", 0);
+    checkFilter(client, dbName, tblName, "p3 = -33", 1);
     checkFilter(client, dbName, tblName, "p1 = \"p11\" and p2=\"p22\"", 1);
     checkFilter(client, dbName, tblName, "p1 = \"p11\" or p2=\"p23\"", 3);
     checkFilter(client, dbName, tblName, "p1 = \"p11\" or p1=\"p12\"", 4);
+    checkFilter(client, dbName, tblName, "p1 = \"p11\" or p1=\"p12\"", 4);
+    checkFilter(client, dbName, tblName, "p1 = \"p11\" or p1=\"p12\"", 4);
+    checkFilter(client, dbName, tblName, "p1 = \"p11\" and p3 = 31", 1);
+    checkFilter(client, dbName, tblName, "p3 = -33 or p1 = \"p12\"", 3);
 
+    // Test not-equals operator for strings and integers.
+    checkFilter(client, dbName, tblName, "p1 != \"p11\"", 4);
+    checkFilter(client, dbName, tblName, "p2 != \"p23\"", 5);
+    checkFilter(client, dbName, tblName, "p2 != \"p33\"", 6);
+    checkFilter(client, dbName, tblName, "p3 != 32", 4);
+    checkFilter(client, dbName, tblName, "p3 != 8589934592", 6);
+    checkFilter(client, dbName, tblName, "p1 != \"p11\" and p1 != \"p12\"", 2);
+    checkFilter(client, dbName, tblName, "p1 != \"p11\" and p2 != \"p22\"", 4);
+    checkFilter(client, dbName, tblName, "p1 != \"p11\" or p2 != \"p22\"", 5);
+    checkFilter(client, dbName, tblName, "p1 != \"p12\" and p2 != \"p25\"", 3);
+    checkFilter(client, dbName, tblName, "p1 != \"p12\" or p2 != \"p25\"", 6);
+    checkFilter(client, dbName, tblName, "p3 != -33 or p1 != \"p13\"", 5);
+    checkFilter(client, dbName, tblName, "p1 != \"p11\" and p3 = 31", 2);
+    checkFilter(client, dbName, tblName, "p3 != 31 and p1 = \"p12\"", 1);
+
+    // Test reverse order.
+    checkFilter(client, dbName, tblName, "31 != p3 and p1 = \"p12\"", 1);
+    checkFilter(client, dbName, tblName, "\"p23\" = p2", 1);
+
+    // Test and/or more...
     checkFilter(client, dbName, tblName,
         "p1 = \"p11\" or (p1=\"p12\" and p2=\"p21\")", 3);
     checkFilter(client, dbName, tblName,
@@ -2007,11 +2011,11 @@ public abstract class TestHiveMetaStore extends TestCase {
     checkFilter(client, dbName, tblName,
        "p1=\"p12\" and p2=\"p27\" Or p2=\"p21\"", 2);
 
+    // Test gt/lt/lte/gte/like for strings.
     checkFilter(client, dbName, tblName, "p1 > \"p12\"", 2);
     checkFilter(client, dbName, tblName, "p1 >= \"p12\"", 4);
     checkFilter(client, dbName, tblName, "p1 < \"p12\"", 2);
     checkFilter(client, dbName, tblName, "p1 <= \"p12\"", 4);
-    checkFilter(client, dbName, tblName, "p1 <> \"p12\"", 4);
     checkFilter(client, dbName, tblName, "p1 like \"p1.*\"", 6);
     checkFilter(client, dbName, tblName, "p2 like \"p.*3\"", 1);
 
@@ -2032,6 +2036,17 @@ public abstract class TestHiveMetaStore extends TestCase {
     assertNotNull(me);
     assertTrue("Filter on int partition key", me.getMessage().contains(
           "Filtering is supported only on partition keys of type string"));
+
+    try {
+      client.listPartitionsByFilter(dbName,
+          tblName, "p3 >= 31", (short) -1);
+    } catch(MetaException e) {
+      me = e;
+    }
+    assertNotNull(me);
+    assertTrue("Filter on int partition key", me.getMessage().contains(
+          "Filtering is supported only on partition keys of type string"));
+
 
     me = null;
     try {

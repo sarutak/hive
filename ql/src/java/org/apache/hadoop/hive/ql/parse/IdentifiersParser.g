@@ -173,8 +173,9 @@ function
         (star=STAR)
         | (dist=KW_DISTINCT)? (selectExpression (COMMA selectExpression)*)?
       )
-    RPAREN -> {$star != null}? ^(TOK_FUNCTIONSTAR functionName)
-           -> {$dist == null}? ^(TOK_FUNCTION functionName (selectExpression+)?)
+    RPAREN (KW_OVER ws=window_specification)?
+           -> {$star != null}? ^(TOK_FUNCTIONSTAR functionName $ws?)
+           -> {$dist == null}? ^(TOK_FUNCTION functionName (selectExpression+)? $ws?)
                             -> ^(TOK_FUNCTIONDI functionName (selectExpression+)?)
     ;
 
@@ -222,6 +223,7 @@ constant
 @after { gParent.msgs.pop(); }
     :
     Number
+    | dateLiteral
     | StringLiteral
     | stringLiteralSequence
     | BigintLiteral
@@ -244,6 +246,16 @@ charSetStringLiteral
     csName=CharSetName csLiteral=CharSetLiteral -> ^(TOK_CHARSETLITERAL $csName $csLiteral)
     ;
 
+dateLiteral
+    :
+    KW_DATE StringLiteral ->
+    {
+      // Create DateLiteral token, but with the text of the string value
+      // This makes the dateLiteral more consistent with the other type literals.
+      adaptor.create(TOK_DATELITERAL, $StringLiteral.text)
+    }
+    ;
+
 expression
 @init { gParent.msgs.push("expression specification"); }
 @after { gParent.msgs.pop(); }
@@ -254,6 +266,7 @@ expression
 atomExpression
     :
     KW_NULL -> TOK_NULL
+    | dateLiteral
     | constant
     | function
     | castExpression

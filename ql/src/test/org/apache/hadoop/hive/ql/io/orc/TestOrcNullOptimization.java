@@ -1,3 +1,20 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package org.apache.hadoop.hive.ql.io.orc;
 
 import static junit.framework.Assert.assertEquals;
@@ -74,15 +91,21 @@ public class TestOrcNullOptimization {
       inspector = ObjectInspectorFactory.getReflectionObjectInspector
           (MyStruct.class, ObjectInspectorFactory.ObjectInspectorOptions.JAVA);
     }
-    Writer writer = OrcFile.createWriter(fs, testFilePath, conf, inspector,
-        100000, CompressionKind.NONE, 10000, 10000);
+    Writer writer = OrcFile.createWriter(testFilePath,
+                                         OrcFile.writerOptions(conf)
+                                         .inspector(inspector)
+                                         .stripeSize(100000)
+                                         .compress(CompressionKind.NONE)
+                                         .bufferSize(10000));
     Random rand = new Random(100);
-    writer.addRow(new MyStruct(null, null, true, Lists.newArrayList(new InnerStruct(100))));
+    writer.addRow(new MyStruct(null, null, true,
+                               Lists.newArrayList(new InnerStruct(100))));
     for (int i = 2; i < 20000; i++) {
       writer.addRow(new MyStruct(rand.nextInt(1), "a", true, Lists
           .newArrayList(new InnerStruct(100))));
     }
-    writer.addRow(new MyStruct(null, null, true, Lists.newArrayList(new InnerStruct(100))));
+    writer.addRow(new MyStruct(null, null, true,
+                               Lists.newArrayList(new InnerStruct(100))));
     writer.close();
 
     Reader reader = OrcFile.createReader(fs, testFilePath);
@@ -100,7 +123,8 @@ public class TestOrcNullOptimization {
 
     assertEquals("a", ((StringColumnStatistics) stats[2]).getMaximum());
     assertEquals("a", ((StringColumnStatistics) stats[2]).getMinimum());
-    assertEquals(19998, ((StringColumnStatistics) stats[2]).getNumberOfValues());
+    assertEquals(19998,
+                 ((StringColumnStatistics) stats[2]).getNumberOfValues());
     assertEquals("count: 19998 min: a max: a",
         stats[2].toString());
 
@@ -125,8 +149,10 @@ public class TestOrcNullOptimization {
     List<Boolean> got = Lists.newArrayList();
     // check if the strip footer contains PRESENT stream
     for (StripeInformation sinfo : reader.getStripes()) {
-      OrcProto.StripeFooter sf = ((RecordReaderImpl) rows).readStripeFooter(sinfo);
-      got.add(sf.toString().indexOf(OrcProto.Stream.Kind.PRESENT.toString()) != -1);
+      OrcProto.StripeFooter sf =
+        ((RecordReaderImpl) rows).readStripeFooter(sinfo);
+      got.add(sf.toString().indexOf(OrcProto.Stream.Kind.PRESENT.toString())
+              != -1);
     }
     assertEquals(expected, got);
 
@@ -137,7 +163,8 @@ public class TestOrcNullOptimization {
     assertNull(row.getFieldValue(1));
     assertEquals(new BooleanWritable(true), row.getFieldValue(2));
     assertEquals(new IntWritable(100),
-        ((OrcStruct) ((ArrayList<?>) row.getFieldValue(3)).get(0)).getFieldValue(0));
+        ((OrcStruct) ((ArrayList<?>) row.getFieldValue(3)).get(0)).
+                 getFieldValue(0));
 
     rows.seekToRow(19998);
     // last-1 row
@@ -147,7 +174,8 @@ public class TestOrcNullOptimization {
     assertEquals(new IntWritable(0), row.getFieldValue(0));
     assertEquals(new BooleanWritable(true), row.getFieldValue(2));
     assertEquals(new IntWritable(100),
-        ((OrcStruct) ((ArrayList<?>) row.getFieldValue(3)).get(0)).getFieldValue(0));
+        ((OrcStruct) ((ArrayList<?>) row.getFieldValue(3)).get(0)).
+                 getFieldValue(0));
 
     // last row
     row = (OrcStruct) rows.next(row);
@@ -156,7 +184,8 @@ public class TestOrcNullOptimization {
     assertNull(row.getFieldValue(1));
     assertEquals(new BooleanWritable(true), row.getFieldValue(2));
     assertEquals(new IntWritable(100),
-        ((OrcStruct) ((ArrayList<?>) row.getFieldValue(3)).get(0)).getFieldValue(0));
+        ((OrcStruct) ((ArrayList<?>) row.getFieldValue(3)).get(0)).
+                 getFieldValue(0));
 
     rows.close();
   }
@@ -168,14 +197,19 @@ public class TestOrcNullOptimization {
       inspector = ObjectInspectorFactory.getReflectionObjectInspector
           (MyStruct.class, ObjectInspectorFactory.ObjectInspectorOptions.JAVA);
     }
-    Writer writer = OrcFile.createWriter(fs, testFilePath, conf, inspector,
-        100000, CompressionKind.NONE, 10000, 10000);
+    Writer writer = OrcFile.createWriter(testFilePath,
+                                         OrcFile.writerOptions(conf)
+                                         .inspector(inspector)
+                                         .stripeSize(100000)
+                                         .compress(CompressionKind.NONE)
+                                         .bufferSize(10000));
     Random rand = new Random(100);
     for (int i = 1; i < 20000; i++) {
       writer.addRow(new MyStruct(rand.nextInt(1), "a", true, Lists
           .newArrayList(new InnerStruct(100))));
     }
-    writer.addRow(new MyStruct(0, "b", true, Lists.newArrayList(new InnerStruct(100))));
+    writer.addRow(new MyStruct(0, "b", true,
+                               Lists.newArrayList(new InnerStruct(100))));
     writer.close();
 
     Reader reader = OrcFile.createReader(fs, testFilePath);
@@ -193,7 +227,8 @@ public class TestOrcNullOptimization {
 
     assertEquals("b", ((StringColumnStatistics) stats[2]).getMaximum());
     assertEquals("a", ((StringColumnStatistics) stats[2]).getMinimum());
-    assertEquals(20000, ((StringColumnStatistics) stats[2]).getNumberOfValues());
+    assertEquals(20000,
+                 ((StringColumnStatistics) stats[2]).getNumberOfValues());
     assertEquals("count: 20000 min: a max: b",
         stats[2].toString());
 
@@ -216,8 +251,10 @@ public class TestOrcNullOptimization {
     List<Boolean> got = Lists.newArrayList();
     // check if the strip footer contains PRESENT stream
     for (StripeInformation sinfo : reader.getStripes()) {
-      OrcProto.StripeFooter sf = ((RecordReaderImpl) rows).readStripeFooter(sinfo);
-      got.add(sf.toString().indexOf(OrcProto.Stream.Kind.PRESENT.toString()) != -1);
+      OrcProto.StripeFooter sf =
+        ((RecordReaderImpl) rows).readStripeFooter(sinfo);
+      got.add(sf.toString().indexOf(OrcProto.Stream.Kind.PRESENT.toString())
+              != -1);
     }
     assertEquals(expected, got);
 
@@ -230,7 +267,8 @@ public class TestOrcNullOptimization {
     assertEquals("a", row.getFieldValue(1).toString());
     assertEquals(new BooleanWritable(true), row.getFieldValue(2));
     assertEquals(new IntWritable(100),
-        ((OrcStruct) ((ArrayList<?>) row.getFieldValue(3)).get(0)).getFieldValue(0));
+                 ((OrcStruct) ((ArrayList<?>) row.getFieldValue(3)).get(0)).
+                   getFieldValue(0));
 
     // last row
     row = (OrcStruct) rows.next(row);
@@ -240,8 +278,8 @@ public class TestOrcNullOptimization {
     assertEquals("b", row.getFieldValue(1).toString());
     assertEquals(new BooleanWritable(true), row.getFieldValue(2));
     assertEquals(new IntWritable(100),
-        ((OrcStruct) ((ArrayList<?>) row.getFieldValue(3)).get(0)).getFieldValue(0));
-
+                 ((OrcStruct) ((ArrayList<?>) row.getFieldValue(3)).get(0)).
+                   getFieldValue(0));
     rows.close();
   }
 
@@ -252,16 +290,27 @@ public class TestOrcNullOptimization {
       inspector = ObjectInspectorFactory.getReflectionObjectInspector
           (MyStruct.class, ObjectInspectorFactory.ObjectInspectorOptions.JAVA);
     }
-    Writer writer = OrcFile.createWriter(fs, testFilePath, conf, inspector,
-        100000, CompressionKind.ZLIB, 10000, 10000);
-    writer.addRow(new MyStruct(3, "a", true, Lists.newArrayList(new InnerStruct(100))));
-    writer.addRow(new MyStruct(null, "b", true, Lists.newArrayList(new InnerStruct(100))));
-    writer.addRow(new MyStruct(3, null, false, Lists.newArrayList(new InnerStruct(100))));
-    writer.addRow(new MyStruct(3, "d", true, Lists.newArrayList(new InnerStruct(100))));
-    writer.addRow(new MyStruct(2, "e", true, Lists.newArrayList(new InnerStruct(100))));
-    writer.addRow(new MyStruct(2, "f", true, Lists.newArrayList(new InnerStruct(100))));
-    writer.addRow(new MyStruct(2, "g", true, Lists.newArrayList(new InnerStruct(100))));
-    writer.addRow(new MyStruct(2, "h", true, Lists.newArrayList(new InnerStruct(100))));
+    Writer writer = OrcFile.createWriter(testFilePath,
+                                         OrcFile.writerOptions(conf)
+                                         .inspector(inspector)
+                                         .stripeSize(100000)
+                                         .bufferSize(10000));
+    writer.addRow(new MyStruct(3, "a", true,
+                               Lists.newArrayList(new InnerStruct(100))));
+    writer.addRow(new MyStruct(null, "b", true,
+                               Lists.newArrayList(new InnerStruct(100))));
+    writer.addRow(new MyStruct(3, null, false,
+                               Lists.newArrayList(new InnerStruct(100))));
+    writer.addRow(new MyStruct(3, "d", true,
+                               Lists.newArrayList(new InnerStruct(100))));
+    writer.addRow(new MyStruct(2, "e", true,
+                               Lists.newArrayList(new InnerStruct(100))));
+    writer.addRow(new MyStruct(2, "f", true,
+                               Lists.newArrayList(new InnerStruct(100))));
+    writer.addRow(new MyStruct(2, "g", true,
+                               Lists.newArrayList(new InnerStruct(100))));
+    writer.addRow(new MyStruct(2, "h", true,
+                               Lists.newArrayList(new InnerStruct(100))));
     writer.close();
 
     Reader reader = OrcFile.createReader(fs, testFilePath);
@@ -302,8 +351,10 @@ public class TestOrcNullOptimization {
     List<Boolean> got = Lists.newArrayList();
     // check if the strip footer contains PRESENT stream
     for (StripeInformation sinfo : reader.getStripes()) {
-      OrcProto.StripeFooter sf = ((RecordReaderImpl) rows).readStripeFooter(sinfo);
-      got.add(sf.toString().indexOf(OrcProto.Stream.Kind.PRESENT.toString()) != -1);
+      OrcProto.StripeFooter sf =
+        ((RecordReaderImpl) rows).readStripeFooter(sinfo);
+      got.add(sf.toString().indexOf(OrcProto.Stream.Kind.PRESENT.toString())
+              != -1);
     }
     assertEquals(expected, got);
 
@@ -314,7 +365,8 @@ public class TestOrcNullOptimization {
     assertEquals("a", row.getFieldValue(1).toString());
     assertEquals(new BooleanWritable(true), row.getFieldValue(2));
     assertEquals(new IntWritable(100),
-        ((OrcStruct) ((ArrayList<?>) row.getFieldValue(3)).get(0)).getFieldValue(0));
+        ((OrcStruct) ((ArrayList<?>) row.getFieldValue(3)).get(0)).
+                 getFieldValue(0));
 
     // row 2
     row = (OrcStruct) rows.next(row);
@@ -323,7 +375,8 @@ public class TestOrcNullOptimization {
     assertEquals("b", row.getFieldValue(1).toString());
     assertEquals(new BooleanWritable(true), row.getFieldValue(2));
     assertEquals(new IntWritable(100),
-        ((OrcStruct) ((ArrayList<?>) row.getFieldValue(3)).get(0)).getFieldValue(0));
+        ((OrcStruct) ((ArrayList<?>) row.getFieldValue(3)).get(0)).
+                 getFieldValue(0));
 
     // row 3
     row = (OrcStruct) rows.next(row);
@@ -332,7 +385,8 @@ public class TestOrcNullOptimization {
     assertEquals(new IntWritable(3), row.getFieldValue(0));
     assertEquals(new BooleanWritable(false), row.getFieldValue(2));
     assertEquals(new IntWritable(100),
-        ((OrcStruct) ((ArrayList<?>) row.getFieldValue(3)).get(0)).getFieldValue(0));
+                 ((OrcStruct) ((ArrayList<?>) row.getFieldValue(3)).get(0)).
+                 getFieldValue(0));
     rows.close();
   }
 }

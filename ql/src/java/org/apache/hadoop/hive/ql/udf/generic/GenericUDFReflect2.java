@@ -29,9 +29,9 @@ import org.apache.hadoop.hive.ql.exec.UDFArgumentLengthException;
 import org.apache.hadoop.hive.ql.exec.UDFArgumentTypeException;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.udf.UDFType;
-import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
 import org.apache.hadoop.hive.serde2.io.ByteWritable;
 import org.apache.hadoop.hive.serde2.io.DoubleWritable;
+import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
 import org.apache.hadoop.hive.serde2.io.ShortWritable;
 import org.apache.hadoop.hive.serde2.io.TimestampWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.ConstantObjectInspector;
@@ -39,6 +39,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils.PrimitiveTypeEntry;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.StringObjectInspector;
 import org.apache.hadoop.io.BooleanWritable;
 import org.apache.hadoop.io.BytesWritable;
@@ -57,11 +58,11 @@ import org.apache.hadoop.io.Writable;
 @UDFType(deterministic = true)
 public class GenericUDFReflect2 extends AbstractGenericUDFReflect {
 
-  PrimitiveObjectInspector targetOI;
-  PrimitiveObjectInspector returnOI;
-  Method method;
+  private PrimitiveObjectInspector targetOI;
+  private PrimitiveObjectInspector returnOI;
+  private transient Method method;
 
-  transient Writable returnObj;
+  private transient Writable returnObj;
 
   @Override
   public ObjectInspector initialize(ObjectInspector[] arguments) throws UDFArgumentException {
@@ -93,8 +94,12 @@ public class GenericUDFReflect2 extends AbstractGenericUDFReflect {
 
     try {
       method = findMethod(targetClass, methodName.toString(), null, true);
+      // While getTypeFor() returns a TypeEntry, we won't actually be able to get any
+      // type parameter information from this since the TypeEntry is derived from a return type.
+      PrimitiveTypeEntry typeEntry = getTypeFor(method.getReturnType());
       returnOI = PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(
-          getTypeFor(method.getReturnType()).primitiveCategory);
+          PrimitiveObjectInspectorUtils.getTypeEntryFromTypeSpecs(
+              typeEntry.primitiveCategory, typeEntry.typeParams));
       returnObj = (Writable) returnOI.getPrimitiveWritableClass().newInstance();
     } catch (Exception e) {
       throw new UDFArgumentException(e);

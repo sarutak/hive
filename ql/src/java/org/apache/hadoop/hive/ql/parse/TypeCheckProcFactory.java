@@ -18,6 +18,7 @@
 
 package org.apache.hadoop.hive.ql.parse;
 
+import java.sql.Date;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -54,12 +55,14 @@ import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeFieldDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeNullDesc;
+import org.apache.hadoop.hive.ql.udf.SettableUDF;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDF;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFBaseCompare;
 import org.apache.hadoop.hive.ql.udf.generic.GenericUDFOPEqual;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
+import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeParams;
 import org.apache.hadoop.hive.serde2.typeinfo.ListTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.MapTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
@@ -152,7 +155,8 @@ public final class TypeCheckProcFactory {
         getStrExprProcessor());
     opRules.put(new RuleRegExp("R4", HiveParser.KW_TRUE + "%|"
         + HiveParser.KW_FALSE + "%"), getBoolExprProcessor());
-    opRules.put(new RuleRegExp("R5", HiveParser.TOK_TABLE_OR_COL + "%"),
+    opRules.put(new RuleRegExp("R5", HiveParser.TOK_DATELITERAL + "%"), getDateExprProcessor());
+    opRules.put(new RuleRegExp("R6", HiveParser.TOK_TABLE_OR_COL + "%"),
         getColumnExprProcessor());
 
     // The dispatcher fires the processor corresponding to the closest matching
@@ -174,7 +178,8 @@ public final class TypeCheckProcFactory {
   private static Map<ASTNode, ExprNodeDesc> convert(Map<Node, Object> outputs) {
     Map<ASTNode, ExprNodeDesc> converted = new LinkedHashMap<ASTNode, ExprNodeDesc>();
     for (Map.Entry<Node, Object> entry : outputs.entrySet()) {
-      if (entry.getKey() instanceof ASTNode && entry.getValue() instanceof ExprNodeDesc) {
+      if (entry.getKey() instanceof ASTNode &&
+          (entry.getValue() == null || entry.getValue() instanceof ExprNodeDesc)) {
         converted.put((ASTNode)entry.getKey(), (ExprNodeDesc)entry.getValue());
       } else {
         LOG.warn("Invalid type entry " + entry);
@@ -255,7 +260,7 @@ public final class TypeCheckProcFactory {
                 0, expr.getText().length() - 1));
         } else if (expr.getText().endsWith("BD")) {
           // Literal decimal
-          return new ExprNodeConstantDesc(TypeInfoFactory.decimalTypeInfo, 
+          return new ExprNodeConstantDesc(TypeInfoFactory.decimalTypeInfo,
                 expr.getText().substring(0, expr.getText().length() - 2));
         } else {
           v = Double.valueOf(expr.getText());
@@ -388,6 +393,47 @@ public final class TypeCheckProcFactory {
   }
 
   /**
+   * Processor for date constants.
+   */
+  public static class DateExprProcessor implements NodeProcessor {
+
+    @Override
+    public Object process(Node nd, Stack<Node> stack, NodeProcessorCtx procCtx,
+        Object... nodeOutputs) throws SemanticException {
+
+      TypeCheckCtx ctx = (TypeCheckCtx) procCtx;
+      if (ctx.getError() != null) {
+        return null;
+      }
+
+      ExprNodeDesc desc = TypeCheckProcFactory.processGByExpr(nd, procCtx);
+      if (desc != null) {
+        return desc;
+      }
+
+      ASTNode expr = (ASTNode) nd;
+
+      // Get the string value and convert to a Date value.
+      try {
+        String dateString = BaseSemanticAnalyzer.stripQuotes(expr.getText());
+        Date date = Date.valueOf(dateString);
+        return new ExprNodeConstantDesc(TypeInfoFactory.dateTypeInfo, date);
+      } catch (IllegalArgumentException err) {
+        throw new SemanticException("Unable to convert date literal string to date value.", err);
+      }
+    }
+  }
+
+  /**
+   * Factory method to get DateExprProcessor.
+   *
+   * @return DateExprProcessor.
+   */
+  public static DateExprProcessor getDateExprProcessor() {
+    return new DateExprProcessor();
+  }
+
+  /**
    * Processor for table columns.
    */
   public static class ColumnExprProcessor implements NodeProcessor {
@@ -517,8 +563,12 @@ public final class TypeCheckProcFactory {
           serdeConstants.DOUBLE_TYPE_NAME);
       conversionFunctionTextHashMap.put(HiveParser.TOK_STRING,
           serdeConstants.STRING_TYPE_NAME);
+      conversionFunctionTextHashMap.put(HiveParser.TOK_VARCHAR,
+          serdeConstants.VARCHAR_TYPE_NAME);
       conversionFunctionTextHashMap.put(HiveParser.TOK_BINARY,
           serdeConstants.BINARY_TYPE_NAME);
+      conversionFunctionTextHashMap.put(HiveParser.TOK_DATE,
+          serdeConstants.DATE_TYPE_NAME);
       conversionFunctionTextHashMap.put(HiveParser.TOK_TIMESTAMP,
           serdeConstants.TIMESTAMP_TYPE_NAME);
       conversionFunctionTextHashMap.put(HiveParser.TOK_DECIMAL,
@@ -597,7 +647,7 @@ public final class TypeCheckProcFactory {
      *
      * @throws UDFArgumentException
      */
-    public static ExprNodeDesc getFuncExprNodeDesc(String udfName,
+    static ExprNodeDesc getFuncExprNodeDescWithUdfData(String udfName, Object udfData,
         ExprNodeDesc... children) throws UDFArgumentException {
 
       FunctionInfo fi = FunctionRegistry.getFunctionInfo(udfName);
@@ -611,9 +661,21 @@ public final class TypeCheckProcFactory {
             + " is an aggregation function or a table function.");
       }
 
+      // Add udfData to UDF if necessary
+      if (udfData != null) {
+        if (genericUDF instanceof SettableUDF) {
+          ((SettableUDF)genericUDF).setParams(udfData);
+        }
+      }
+
       List<ExprNodeDesc> childrenList = new ArrayList<ExprNodeDesc>(children.length);
       childrenList.addAll(Arrays.asList(children));
       return ExprNodeGenericFuncDesc.newInstance(genericUDF, childrenList);
+    }
+
+    public static ExprNodeDesc getFuncExprNodeDesc(String udfName,
+        ExprNodeDesc... children) throws UDFArgumentException {
+      return getFuncExprNodeDescWithUdfData(udfName, null, children);
     }
 
     static ExprNodeDesc getXpathOrFuncExprNodeDesc(ASTNode expr,
@@ -712,9 +774,30 @@ public final class TypeCheckProcFactory {
           }
         }
 
+        // getGenericUDF() actually clones the UDF. Just call it once and reuse.
+        GenericUDF genericUDF = fi.getGenericUDF();
+
         if (!fi.isNative()) {
           ctx.getUnparseTranslator().addIdentifierTranslation(
               (ASTNode) expr.getChild(0));
+        }
+
+        // Handle type casts that may contain type parameters
+        if (isFunction) {
+          ASTNode funcNameNode = (ASTNode)expr.getChild(0);
+          switch (funcNameNode.getType()) {
+            case HiveParser.TOK_VARCHAR:
+              // Add type params
+              VarcharTypeParams varcharTypeParams = new VarcharTypeParams();
+              varcharTypeParams.length = Integer.valueOf((funcNameNode.getChild(0).getText()));
+              if (genericUDF != null) {
+                ((SettableUDF)genericUDF).setParams(varcharTypeParams);
+              }
+              break;
+            default:
+              // Do nothing
+              break;
+          }
         }
 
         // Detect UDTF's in nested SELECT, GROUP BY, etc as they aren't
@@ -731,8 +814,8 @@ public final class TypeCheckProcFactory {
             throw new SemanticException(ErrorMsg.UDAF_INVALID_LOCATION.getMsg(expr));
           }
         }
-        if (!ctx.getAllowStatefulFunctions() && (fi.getGenericUDF() != null)) {
-          if (FunctionRegistry.isStateful(fi.getGenericUDF())) {
+        if (!ctx.getAllowStatefulFunctions() && (genericUDF != null)) {
+          if (FunctionRegistry.isStateful(genericUDF)) {
             throw new SemanticException(
               ErrorMsg.UDF_STATEFUL_INVALID_LOCATION.getMsg());
           }
@@ -740,7 +823,7 @@ public final class TypeCheckProcFactory {
 
         // Try to infer the type of the constant only if there are two
         // nodes, one of them is column and the other is numeric const
-        if (fi.getGenericUDF() instanceof GenericUDFBaseCompare
+        if (genericUDF instanceof GenericUDFBaseCompare
             && children.size() == 2
             && ((children.get(0) instanceof ExprNodeConstantDesc
                 && children.get(1) instanceof ExprNodeColumnDesc)
@@ -764,10 +847,9 @@ public final class TypeCheckProcFactory {
 
           if (inferTypes.contains(constType) && inferTypes.contains(columnType)
               && !columnType.equalsIgnoreCase(constType)) {
-            String constValue =
-                ((ExprNodeConstantDesc) children.get(constIdx)).getValue().toString();
+            Object originalValue =  ((ExprNodeConstantDesc) children.get(constIdx)).getValue();
+            String constValue = originalValue.toString();
             boolean triedDouble = false;
-
             Number value = null;
             try {
               if (columnType.equalsIgnoreCase(serdeConstants.TINYINT_TYPE_NAME)) {
@@ -780,12 +862,17 @@ public final class TypeCheckProcFactory {
                 value = new Long(constValue);
               } else if (columnType.equalsIgnoreCase(serdeConstants.FLOAT_TYPE_NAME)) {
                 value = new Float(constValue);
-              } else if (columnType.equalsIgnoreCase(serdeConstants.DOUBLE_TYPE_NAME)
-                  || (columnType.equalsIgnoreCase(serdeConstants.STRING_TYPE_NAME)
-                     && !constType.equalsIgnoreCase(serdeConstants.BIGINT_TYPE_NAME))) {
-                // no smart inference for queries like "str_col = bigint_const"
+              } else if (columnType.equalsIgnoreCase(serdeConstants.DOUBLE_TYPE_NAME)) {
                 triedDouble = true;
                 value = new Double(constValue);
+              } else if (columnType.equalsIgnoreCase(serdeConstants.STRING_TYPE_NAME)) {
+                // Don't scramble the const type information if comparing to a string column,
+                // It's not useful to do so; as of now, there is also a hack in
+                // SemanticAnalyzer#genTablePlan that causes every column to look like a string
+                // a string down here, so number type information is always lost otherwise.
+                boolean isNumber = (originalValue instanceof Number);
+                triedDouble = !isNumber;
+                value = isNumber ? (Number)originalValue : new Double(constValue);
               }
             } catch (NumberFormatException nfe) {
               // this exception suggests the precise type inference did not succeed
@@ -793,7 +880,7 @@ public final class TypeCheckProcFactory {
               // however, if we already tried this, or the column is NUMBER type and
               // the operator is EQUAL, return false due to the type mismatch
               if (triedDouble ||
-                  (fi.getGenericUDF() instanceof GenericUDFOPEqual
+                  (genericUDF instanceof GenericUDFOPEqual
                   && !columnType.equals(serdeConstants.STRING_TYPE_NAME))) {
                 return new ExprNodeConstantDesc(false);
               }
@@ -811,7 +898,7 @@ public final class TypeCheckProcFactory {
           }
         }
 
-        desc = ExprNodeGenericFuncDesc.newInstance(fi.getGenericUDF(), children);
+        desc = ExprNodeGenericFuncDesc.newInstance(genericUDF, children);
       }
       // UDFOPPositive is a no-op.
       // However, we still create it, and then remove it here, to make sure we

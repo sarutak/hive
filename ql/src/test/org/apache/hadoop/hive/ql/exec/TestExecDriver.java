@@ -52,8 +52,10 @@ import org.apache.hadoop.hive.ql.plan.MapredWork;
 import org.apache.hadoop.hive.ql.plan.PartitionDesc;
 import org.apache.hadoop.hive.ql.plan.PlanUtils;
 import org.apache.hadoop.hive.ql.plan.ReduceSinkDesc;
+import org.apache.hadoop.hive.ql.plan.ReduceWork;
 import org.apache.hadoop.hive.ql.plan.ScriptDesc;
 import org.apache.hadoop.hive.ql.plan.SelectDesc;
+import org.apache.hadoop.hive.ql.session.SessionState;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 import org.apache.hadoop.mapred.TextInputFormat;
@@ -77,7 +79,8 @@ public class TestExecDriver extends TestCase {
   static {
     try {
       conf = new HiveConf(ExecDriver.class);
-
+      SessionState.start(conf);
+      
       fs = FileSystem.get(conf);
       if (fs.exists(tmppath) && !fs.getFileStatus(tmppath).isDir()) {
         throw new RuntimeException(tmpdir + " exists but is not a directory");
@@ -141,7 +144,7 @@ public class TestExecDriver extends TestCase {
   }
 
   public static void addMapWork(MapredWork mr, Table tbl, String alias, Operator<?> work) {
-    mr.addMapWork(tbl.getDataLocation().toString(), alias, work, new PartitionDesc(
+    mr.getMapWork().addMapWork(tbl.getDataLocation().toString(), alias, work, new PartitionDesc(
         Utilities.getTableDesc(tbl), null));
   }
 
@@ -194,7 +197,6 @@ public class TestExecDriver extends TestCase {
 
   @SuppressWarnings("unchecked")
   private void populateMapPlan1(Table src) {
-    mr.setNumReduceTasks(Integer.valueOf(0));
 
     Operator<FileSinkDesc> op2 = OperatorFactory.get(new FileSinkDesc(tmpdir
         + "mapplan1.out", Utilities.defaultTd, true));
@@ -206,7 +208,6 @@ public class TestExecDriver extends TestCase {
 
   @SuppressWarnings("unchecked")
   private void populateMapPlan2(Table src) {
-    mr.setNumReduceTasks(Integer.valueOf(0));
 
     Operator<FileSinkDesc> op3 = OperatorFactory.get(new FileSinkDesc(tmpdir
         + "mapplan2.out", Utilities.defaultTd, false));
@@ -225,7 +226,6 @@ public class TestExecDriver extends TestCase {
 
   @SuppressWarnings("unchecked")
   private void populateMapRedPlan1(Table src) throws SemanticException {
-    mr.setNumReduceTasks(Integer.valueOf(1));
 
     ArrayList<String> outputColumns = new ArrayList<String>();
     for (int i = 0; i < 2; i++) {
@@ -238,8 +238,11 @@ public class TestExecDriver extends TestCase {
         -1, 1, -1));
 
     addMapWork(mr, src, "a", op1);
-    mr.setKeyDesc(op1.getConf().getKeySerializeInfo());
-    mr.getTagToValueDesc().add(op1.getConf().getValueSerializeInfo());
+    ReduceWork rWork = new ReduceWork();
+    rWork.setNumReduceTasks(Integer.valueOf(1));
+    rWork.setKeyDesc(op1.getConf().getKeySerializeInfo());
+    rWork.getTagToValueDesc().add(op1.getConf().getValueSerializeInfo());
+    mr.setReduceWork(rWork);
 
     // reduce side work
     Operator<FileSinkDesc> op3 = OperatorFactory.get(new FileSinkDesc(tmpdir
@@ -248,12 +251,11 @@ public class TestExecDriver extends TestCase {
     Operator<ExtractDesc> op2 = OperatorFactory.get(new ExtractDesc(
         getStringColumn(Utilities.ReduceField.VALUE.toString())), op3);
 
-    mr.setReducer(op2);
+    rWork.setReducer(op2);
   }
 
   @SuppressWarnings("unchecked")
   private void populateMapRedPlan2(Table src) throws SemanticException {
-    mr.setNumReduceTasks(Integer.valueOf(1));
     ArrayList<String> outputColumns = new ArrayList<String>();
     for (int i = 0; i < 2; i++) {
       outputColumns.add("_col" + i);
@@ -266,8 +268,11 @@ public class TestExecDriver extends TestCase {
         outputColumns, false, -1, 1, -1));
 
     addMapWork(mr, src, "a", op1);
-    mr.setKeyDesc(op1.getConf().getKeySerializeInfo());
-    mr.getTagToValueDesc().add(op1.getConf().getValueSerializeInfo());
+    ReduceWork rWork = new ReduceWork();
+    rWork.setNumReduceTasks(Integer.valueOf(1));
+    rWork.setKeyDesc(op1.getConf().getKeySerializeInfo());
+    rWork.getTagToValueDesc().add(op1.getConf().getValueSerializeInfo());
+    mr.setReduceWork(rWork);
 
     // reduce side work
     Operator<FileSinkDesc> op4 = OperatorFactory.get(new FileSinkDesc(tmpdir
@@ -278,7 +283,7 @@ public class TestExecDriver extends TestCase {
     Operator<ExtractDesc> op2 = OperatorFactory.get(new ExtractDesc(
         getStringColumn(Utilities.ReduceField.VALUE.toString())), op3);
 
-    mr.setReducer(op2);
+    rWork.setReducer(op2);
   }
 
   /**
@@ -286,8 +291,6 @@ public class TestExecDriver extends TestCase {
    */
   @SuppressWarnings("unchecked")
   private void populateMapRedPlan3(Table src, Table src2) throws SemanticException {
-    mr.setNumReduceTasks(Integer.valueOf(5));
-    mr.setNeedsTagging(true);
     List<String> outputColumns = new ArrayList<String>();
     for (int i = 0; i < 2; i++) {
       outputColumns.add("_col" + i);
@@ -299,8 +302,6 @@ public class TestExecDriver extends TestCase {
         Byte.valueOf((byte) 0), 1, -1));
 
     addMapWork(mr, src, "a", op1);
-    mr.setKeyDesc(op1.getConf().getKeySerializeInfo());
-    mr.getTagToValueDesc().add(op1.getConf().getValueSerializeInfo());
 
     Operator<ReduceSinkDesc> op2 = OperatorFactory.get(PlanUtils
         .getReduceSinkDesc(Utilities.makeList(getStringColumn("key")),
@@ -308,7 +309,14 @@ public class TestExecDriver extends TestCase {
         Byte.valueOf((byte) 1), Integer.MAX_VALUE, -1));
 
     addMapWork(mr, src2, "b", op2);
-    mr.getTagToValueDesc().add(op2.getConf().getValueSerializeInfo());
+    ReduceWork rWork = new ReduceWork();
+    rWork.setNumReduceTasks(Integer.valueOf(5));
+    rWork.setNeedsTagging(true);
+    rWork.setKeyDesc(op1.getConf().getKeySerializeInfo());
+    rWork.getTagToValueDesc().add(op1.getConf().getValueSerializeInfo());
+
+    mr.setReduceWork(rWork);
+    rWork.getTagToValueDesc().add(op2.getConf().getValueSerializeInfo());
 
     // reduce side work
     Operator<FileSinkDesc> op4 = OperatorFactory.get(new FileSinkDesc(tmpdir
@@ -320,12 +328,11 @@ public class TestExecDriver extends TestCase {
         Utilities.ReduceField.VALUE.toString(), "", false), "0", false)),
         Utilities.makeList(outputColumns.get(0))), op4);
 
-    mr.setReducer(op5);
+    rWork.setReducer(op5);
   }
 
   @SuppressWarnings("unchecked")
   private void populateMapRedPlan4(Table src) throws SemanticException {
-    mr.setNumReduceTasks(Integer.valueOf(1));
 
     // map-side work
     ArrayList<String> outputColumns = new ArrayList<String>();
@@ -348,8 +355,11 @@ public class TestExecDriver extends TestCase {
         outputColumns), op0);
 
     addMapWork(mr, src, "a", op4);
-    mr.setKeyDesc(op1.getConf().getKeySerializeInfo());
-    mr.getTagToValueDesc().add(op1.getConf().getValueSerializeInfo());
+    ReduceWork rWork = new ReduceWork();
+    rWork.setKeyDesc(op1.getConf().getKeySerializeInfo());
+    rWork.getTagToValueDesc().add(op1.getConf().getValueSerializeInfo());
+    rWork.setNumReduceTasks(Integer.valueOf(1));
+    mr.setReduceWork(rWork);
 
     // reduce side work
     Operator<FileSinkDesc> op3 = OperatorFactory.get(new FileSinkDesc(tmpdir
@@ -358,7 +368,7 @@ public class TestExecDriver extends TestCase {
     Operator<ExtractDesc> op2 = OperatorFactory.get(new ExtractDesc(
         getStringColumn(Utilities.ReduceField.VALUE.toString())), op3);
 
-    mr.setReducer(op2);
+    rWork.setReducer(op2);
   }
 
   public static ExprNodeColumnDesc getStringColumn(String columnName) {
@@ -368,7 +378,6 @@ public class TestExecDriver extends TestCase {
 
   @SuppressWarnings("unchecked")
   private void populateMapRedPlan5(Table src) throws SemanticException {
-    mr.setNumReduceTasks(Integer.valueOf(1));
 
     // map-side work
     ArrayList<String> outputColumns = new ArrayList<String>();
@@ -385,8 +394,11 @@ public class TestExecDriver extends TestCase {
         outputColumns), op0);
 
     addMapWork(mr, src, "a", op4);
-    mr.setKeyDesc(op0.getConf().getKeySerializeInfo());
-    mr.getTagToValueDesc().add(op0.getConf().getValueSerializeInfo());
+    ReduceWork rWork = new ReduceWork();
+    mr.setReduceWork(rWork);
+    rWork.setNumReduceTasks(Integer.valueOf(1));
+    rWork.setKeyDesc(op0.getConf().getKeySerializeInfo());
+    rWork.getTagToValueDesc().add(op0.getConf().getValueSerializeInfo());
 
     // reduce side work
     Operator<FileSinkDesc> op3 = OperatorFactory.get(new FileSinkDesc(tmpdir
@@ -395,12 +407,11 @@ public class TestExecDriver extends TestCase {
     Operator<ExtractDesc> op2 = OperatorFactory.get(new ExtractDesc(
         getStringColumn(Utilities.ReduceField.VALUE.toString())), op3);
 
-    mr.setReducer(op2);
+    rWork.setReducer(op2);
   }
 
   @SuppressWarnings("unchecked")
   private void populateMapRedPlan6(Table src) throws SemanticException {
-    mr.setNumReduceTasks(Integer.valueOf(1));
 
     // map-side work
     ArrayList<String> outputColumns = new ArrayList<String>();
@@ -424,8 +435,11 @@ public class TestExecDriver extends TestCase {
         outputColumns), op0);
 
     addMapWork(mr, src, "a", op4);
-    mr.setKeyDesc(op1.getConf().getKeySerializeInfo());
-    mr.getTagToValueDesc().add(op1.getConf().getValueSerializeInfo());
+    ReduceWork rWork = new ReduceWork();
+    mr.setReduceWork(rWork);
+    rWork.setNumReduceTasks(Integer.valueOf(1));
+    rWork.setKeyDesc(op1.getConf().getKeySerializeInfo());
+    rWork.getTagToValueDesc().add(op1.getConf().getValueSerializeInfo());
 
     // reduce side work
     Operator<FileSinkDesc> op3 = OperatorFactory.get(new FileSinkDesc(tmpdir
@@ -436,7 +450,7 @@ public class TestExecDriver extends TestCase {
     Operator<ExtractDesc> op5 = OperatorFactory.get(new ExtractDesc(
         getStringColumn(Utilities.ReduceField.VALUE.toString())), op2);
 
-    mr.setReducer(op5);
+    rWork.setReducer(op5);
   }
 
   private void executePlan() throws Exception {

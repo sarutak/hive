@@ -174,6 +174,7 @@ sub globalSetup
     $globalHash->{'webhdfs_url'} = $ENV{'WEBHDFS_URL'};
     $globalHash->{'templeton_url'} = $ENV{'TEMPLETON_URL'};
     $globalHash->{'current_user'} = $ENV{'USER_NAME'};
+    $globalHash->{'DOAS_USER'} = $ENV{'DOAS_USER'};
     $globalHash->{'current_group_user'} = $ENV{'GROUP_USER_NAME'};
     $globalHash->{'current_other_user'} = $ENV{'OTHER_USER_NAME'};
     $globalHash->{'current_group'} = $ENV{'GROUP_NAME'};
@@ -317,6 +318,7 @@ sub replaceParametersInArg
     }
     my $outdir = $testCmd->{'outpath'} . $testCmd->{'group'} . "_" . $testCmd->{'num'};
     $arg =~ s/:UNAME:/$testCmd->{'current_user'}/g;
+    $arg =~ s/:DOAS:/$testCmd->{'DOAS_USER'}/g;
     $arg =~ s/:UNAME_GROUP:/$testCmd->{'current_group_user'}/g;
     $arg =~ s/:UNAME_OTHER:/$testCmd->{'current_other_user'}/g;
     $arg =~ s/:UGROUP:/$testCmd->{'current_group'}/g;
@@ -681,7 +683,12 @@ sub compare
     #try to get the call back url request until timeout
     if ($result == 1 && defined $testCmd->{'check_call_back'}) {
       my $d = $testCmd->{'http_daemon'};
-      $d->timeout(300);         #wait for 5 mins
+      if (defined $testCmd->{'timeout_seconds'}) {
+        $d->timeout($testCmd->{'timeout_seconds'})
+      }
+      else {      
+        $d->timeout(300);         #wait for 5 mins by default
+      }
       my $url_requested;
       $testCmd->{'callback_url'} =~ s/\$jobId/$json_hash->{'id'}/g;
       print $log "Expanded callback url : <" . $testCmd->{'callback_url'} . ">\n";
@@ -732,6 +739,10 @@ sub compare
           my $jobComplete;
           my $NUM_RETRIES = 60;
           my $SLEEP_BETWEEN_RETRIES = 5;
+          if (defined $testCmd->{'timeout_seconds'} && $testCmd->{'timeout_seconds'} > 0) {
+            $SLEEP_BETWEEN_RETRIES = ($testCmd->{'timeout_seconds'} / $NUM_RETRIES);
+            print $log "found timeout_seconds & set SLEEP_BETWEEN_RETRIES=$SLEEP_BETWEEN_RETRIES";
+          }
 
           #first wait for job completion
           while ($NUM_RETRIES-- > 0) {

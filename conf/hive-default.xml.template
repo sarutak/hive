@@ -141,7 +141,7 @@
 
 <property>
   <name>javax.jdo.PersistenceManagerFactoryClass</name>
-  <value>org.datanucleus.jdo.JDOPersistenceManagerFactory</value>
+  <value>org.datanucleus.api.jdo.JDOPersistenceManagerFactory</value>
   <description>class implementing the jdo persistence</description>
 </property>
 
@@ -237,8 +237,8 @@
 
 <property>
   <name>datanucleus.identifierFactory</name>
-  <value>datanucleus</value>
-  <description>Name of the identifier factory to use when generating table/column names etc. 'datanucleus' is used for backward compatibility</description>
+  <value>datanucleus1</value>
+  <description>Name of the identifier factory to use when generating table/column names etc. 'datanucleus1' is used for backward compatibility with DataNucleus v1</description>
 </property>
 
 <property>
@@ -431,19 +431,25 @@
 <property>
   <name>hive.mapjoin.followby.map.aggr.hash.percentmemory</name>
   <value>0.3</value>
-  <description>Portion of total memory to be used by map-side grup aggregation hash table, when this group by is followed by map join</description>
+  <description>Portion of total memory to be used by map-side group aggregation hash table, when this group by is followed by map join</description>
 </property>
 
 <property>
   <name>hive.map.aggr.hash.force.flush.memory.threshold</name>
   <value>0.9</value>
-  <description>The max memory to be used by map-side grup aggregation hash table, if the memory usage is higher than this number, force to flush data</description>
+  <description>The max memory to be used by map-side group aggregation hash table, if the memory usage is higher than this number, force to flush data</description>
 </property>
 
 <property>
   <name>hive.map.aggr.hash.percentmemory</name>
   <value>0.5</value>
-  <description>Portion of total memory to be used by map-side grup aggregation hash table</description>
+  <description>Portion of total memory to be used by map-side group aggregation hash table</description>
+</property>
+
+<property>
+  <name>hive.session.history.enabled</name>
+  <value>false</value>
+  <description>Whether to log hive query, query plan, runtime statistics etc </description>
 </property>
 
 <property>
@@ -860,16 +866,6 @@
 </property>
 
 <property>
-  <name>hive.optimize.mapjoin.mapreduce</name>
-  <value>false</value>
-  <description>If hive.auto.convert.join is off, this parameter does not take
-    affect. If it is on, and if there are map-join jobs followed by a map-reduce
-    job (for e.g a group by), each map-only job is merged with the following
-    map-reduce job.
-  </description>
-</property>
-
-<property>
   <name>hive.script.auto.progress</name>
   <value>false</value>
   <description>Whether Hive Tranform/Map/Reduce Clause should automatically send progress information to TaskTracker to avoid the task getting killed because of inactivity.  Hive sends progress information when the script is outputting to stderr.  This option removes the need of periodically producing stderr messages, but users should be cautious because this may prevent infinite loops in the scripts to be killed by TaskTracker.  </description>
@@ -893,6 +889,18 @@
   <name>hive.script.recordreader</name>
   <value>org.apache.hadoop.hive.ql.exec.TextRecordReader</value>
   <description>The default record reader for reading data from the user scripts. </description>
+</property>
+
+<property>
+  <name>stream.stderr.reporter.prefix</name>
+  <value>reporter:</value>
+  <description>Streaming jobs that log to stardard error with this prefix can log counter or status information.</description>
+</property>
+
+<property>
+  <name>stream.stderr.reporter.enabled</name>
+  <value>true</value>
+  <description>Enable consumption of status and counter messages for streaming jobs.</description>
 </property>
 
 <property>
@@ -1576,6 +1584,12 @@
 </property>
 
 <property>
+  <name>hive.limit.pushdown.memory.usage</name>
+  <value>0.3f</value>
+  <description>The max memory to be used for hash in RS operator for top K selection.</description>
+</property>
+
+<property>
   <name>hive.rework.mapredwork</name>
   <value>false</value>
   <description>should rework the mapred work or not.
@@ -1695,6 +1709,15 @@
     If this is set the header for RC Files will simply be RCF.  If this is not
     set the header will be that borrowed from sequence files, e.g. SEQ- followed
     by the input and output RC File formats.
+  </description>
+</property>
+
+<property>
+  <name>hive.exec.orc.dictionary.key.size.threshold</name>
+  <value>0.8</value>
+  <description>
+    If the number of keys in a dictionary is greater than this fraction of the total number of
+    non-null rows, turn off dictionary encoding.  Use 1 to always use dictionary encoding.
   </description>
 </property>
 
@@ -1831,8 +1854,21 @@
 
 <property>
   <name>hive.server2.thrift.max.worker.threads</name>
-  <value>100</value>
+  <value>500</value>
   <description>Maximum number of Thrift worker threads</description>
+</property>
+
+<property>
+  <name>hive.server2.async.exec.threads</name>
+  <value>50</value>
+  <description>Number of threads in the async thread pool for HiveServer2</description>
+</property>
+
+<property>
+  <name>hive.server2.async.exec.shutdown.timeout</name>
+  <value>10</value>
+  <description>Time (in seconds) for which HiveServer2 shutdown will wait for async 
+  threads to terminate</description>
 </property>
 
 <property>
@@ -1917,6 +1953,36 @@
   </description>
 </property>
 
+<property>
+  <name>hive.server2.table.type.mapping</name>
+  <value>CLASSIC</value>
+  <description>
+   This setting reflects how HiveServer will report the table types for JDBC and other
+   client implementations that retrieves the available tables and supported table types
+     HIVE : Exposes the hive's native table tyes like MANAGED_TABLE, EXTERNAL_TABLE, VIRTUAL_VIEW
+     CLASSIC : More generic types like TABLE and VIEW
+  </description>
+</property>
+
+<property>
+  <name>hive.server2.thrift.sasl.qop</name>
+  <value>auth</auth>
+  <description>Sasl QOP value; Set it to one of following values to enable higher levels of
+     protection for hive server2 communication with clients.
+      "auth" - authentication only (default)
+      "auth-int" - authentication plus integrity protection
+      "auth-conf" - authentication plus integrity and confidentiality protection
+     This is applicable only hive server2 is configured to use kerberos authentication.
+ </description>
+</property>
+
+<property>
+  <name>hive.plan.serialization.format</name>
+  <value>kryo</value>
+  <description>
+  Query plan format serialization between client and task nodes. 
+  Two supported values are : kryo and javaXML. Kryo is default.
+  </description>
+</property>
 
 </configuration>
-

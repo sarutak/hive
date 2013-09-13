@@ -30,7 +30,9 @@ import java.util.Map;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.hive.serde.serdeConstants;
+import org.apache.hadoop.hive.serde2.io.DateWritable;
 import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable;
+import org.apache.hadoop.hive.serde2.io.HiveVarcharWritable;
 import org.apache.hadoop.hive.serde2.io.TimestampWritable;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorFactory.ObjectInspectorOptions;
@@ -38,9 +40,11 @@ import org.apache.hadoop.hive.serde2.objectinspector.primitive.AbstractPrimitive
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.BinaryObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.BooleanObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.ByteObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.DateObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.DoubleObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.FloatObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveDecimalObjectInspector;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.HiveVarcharObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.IntObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.LongObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory;
@@ -84,8 +88,7 @@ public final class ObjectInspectorUtils {
     if (oi.getCategory() == Category.PRIMITIVE) {
       PrimitiveObjectInspector poi = (PrimitiveObjectInspector) oi;
       if (!(poi instanceof AbstractPrimitiveWritableObjectInspector)) {
-        return PrimitiveObjectInspectorFactory
-            .getPrimitiveWritableObjectInspector(poi.getPrimitiveCategory());
+        return PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(poi);
       }
     }
     return oi;
@@ -109,22 +112,20 @@ public final class ObjectInspectorUtils {
       switch (objectInspectorOption) {
       case DEFAULT: {
         if (poi.preferWritable()) {
-          result = PrimitiveObjectInspectorFactory
-              .getPrimitiveWritableObjectInspector(poi.getPrimitiveCategory());
+          result = PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(poi);
         } else {
           result = PrimitiveObjectInspectorFactory
-              .getPrimitiveJavaObjectInspector(poi.getPrimitiveCategory());
+              .getPrimitiveJavaObjectInspector(poi);
         }
         break;
       }
       case JAVA: {
         result = PrimitiveObjectInspectorFactory
-            .getPrimitiveJavaObjectInspector(poi.getPrimitiveCategory());
+            .getPrimitiveJavaObjectInspector(poi);
         break;
       }
       case WRITABLE: {
-        result = PrimitiveObjectInspectorFactory
-            .getPrimitiveWritableObjectInspector(poi.getPrimitiveCategory());
+        result = PrimitiveObjectInspectorFactory.getPrimitiveWritableObjectInspector(poi);
         break;
       }
       }
@@ -485,9 +486,13 @@ public final class ObjectInspectorUtils {
         }
         return r;
       }
+      case VARCHAR:
+        return ((HiveVarcharObjectInspector)poi).getPrimitiveWritableObject(o).hashCode();
       case BINARY:
         return ((BinaryObjectInspector) poi).getPrimitiveWritableObject(o).hashCode();
 
+      case DATE:
+        return ((DateObjectInspector) poi).getPrimitiveWritableObject(o).hashCode();
       case TIMESTAMP:
         TimestampWritable t = ((TimestampObjectInspector) poi)
             .getPrimitiveWritableObject(o);
@@ -678,12 +683,24 @@ public final class ObjectInspectorUtils {
               .compareTo(s2));
         }
       }
+      case VARCHAR: {
+        HiveVarcharWritable t1 = ((HiveVarcharObjectInspector)poi1).getPrimitiveWritableObject(o1);
+        HiveVarcharWritable t2 = ((HiveVarcharObjectInspector)poi2).getPrimitiveWritableObject(o2);
+        return t1.compareTo(t2);
+      }
       case BINARY: {
         BytesWritable bw1 = ((BinaryObjectInspector) poi1).getPrimitiveWritableObject(o1);
         BytesWritable bw2 = ((BinaryObjectInspector) poi2).getPrimitiveWritableObject(o2);
         return bw1.compareTo(bw2);
       }
 
+      case DATE: {
+        DateWritable d1 = ((DateObjectInspector) poi1)
+            .getPrimitiveWritableObject(o1);
+        DateWritable d2 = ((DateObjectInspector) poi2)
+            .getPrimitiveWritableObject(o2);
+        return d1.compareTo(d2);
+      }
       case TIMESTAMP: {
         TimestampWritable t1 = ((TimestampObjectInspector) poi1)
             .getPrimitiveWritableObject(o1);
@@ -940,7 +957,7 @@ public final class ObjectInspectorUtils {
       case PRIMITIVE:
         PrimitiveObjectInspector poi = (PrimitiveObjectInspector) oi;
         return PrimitiveObjectInspectorFactory.getPrimitiveWritableConstantObjectInspector(
-            poi.getPrimitiveCategory(), writableValue);
+            poi, writableValue);
       case LIST:
         ListObjectInspector loi = (ListObjectInspector) oi;
         return ObjectInspectorFactory.getStandardConstantListObjectInspector(

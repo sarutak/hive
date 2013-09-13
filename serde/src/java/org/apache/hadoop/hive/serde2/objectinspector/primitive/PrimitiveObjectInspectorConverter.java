@@ -18,14 +18,18 @@
 
 package org.apache.hadoop.hive.serde2.objectinspector.primitive;
 
+import java.sql.Date;
 import java.sql.Timestamp;
 
 import org.apache.hadoop.hive.common.type.HiveDecimal;
+import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.apache.hadoop.hive.serde2.ByteStream;
+import org.apache.hadoop.hive.serde2.io.HiveVarcharWritable;
 import org.apache.hadoop.hive.serde2.lazy.LazyInteger;
 import org.apache.hadoop.hive.serde2.lazy.LazyLong;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspectorConverters.Converter;
 import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector;
+import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeParams;
 import org.apache.hadoop.io.Text;
 
 /**
@@ -237,6 +241,27 @@ public class PrimitiveObjectInspectorConverter {
     }
   }
 
+  public static class DateConverter implements Converter {
+    PrimitiveObjectInspector inputOI;
+    SettableDateObjectInspector outputOI;
+    Object r;
+
+    public DateConverter(PrimitiveObjectInspector inputOI,
+        SettableDateObjectInspector outputOI) {
+      this.inputOI = inputOI;
+      this.outputOI = outputOI;
+      r = outputOI.create(new Date(0));
+    }
+
+    public Object convert(Object input) {
+      if (input == null) {
+        return null;
+      }
+      return outputOI.set(r, PrimitiveObjectInspectorUtils.getDate(input,
+          inputOI));
+    }
+  }
+
   public static class TimestampConverter implements Converter {
     PrimitiveObjectInspector inputOI;
     SettableTimestampObjectInspector outputOI;
@@ -276,7 +301,7 @@ public class PrimitiveObjectInspectorConverter {
       if (input == null) {
         return null;
       }
-      
+
       try {
         return outputOI.set(r, PrimitiveObjectInspectorUtils.getHiveDecimal(input,
             inputOI));
@@ -301,6 +326,10 @@ public class PrimitiveObjectInspectorConverter {
 
     @Override
     public Object convert(Object input) {
+      if (input == null) {
+        return null;
+      }
+
       return outputOI.set(r, PrimitiveObjectInspectorUtils.getBinary(input,
           inputOI));
     }
@@ -368,6 +397,17 @@ public class PrimitiveObjectInspectorConverter {
           t.set(((StringObjectInspector) inputOI).getPrimitiveJavaObject(input));
         }
         return t;
+      case VARCHAR:
+        if (inputOI.preferWritable()) {
+          t.set(((HiveVarcharObjectInspector) inputOI).getPrimitiveWritableObject(input)
+              .toString());
+        } else {
+          t.set(((HiveVarcharObjectInspector) inputOI).getPrimitiveJavaObject(input).toString());
+        }
+        return t;
+      case DATE:
+        t.set(((DateObjectInspector) inputOI).getPrimitiveWritableObject(input).toString());
+        return t;
       case TIMESTAMP:
         t.set(((TimestampObjectInspector) inputOI)
             .getPrimitiveWritableObject(input).toString());
@@ -401,4 +441,40 @@ public class PrimitiveObjectInspectorConverter {
     }
   }
 
+
+  public static class HiveVarcharConverter implements Converter {
+
+    PrimitiveObjectInspector inputOI;
+    SettableHiveVarcharObjectInspector outputOI;
+    HiveVarcharWritable hc;
+
+    public HiveVarcharConverter(PrimitiveObjectInspector inputOI,
+        SettableHiveVarcharObjectInspector outputOI) {
+      this.inputOI = inputOI;
+      this.outputOI = outputOI;
+      VarcharTypeParams typeParams = (VarcharTypeParams) outputOI.getTypeParams();
+
+      // unfortunately we seem to get instances of varchar object inspectors without params
+      // when an old-style UDF has an evaluate() method with varchar arguments.
+      // If we disallow varchar in old-style UDFs and only allow GenericUDFs to be defined
+      // with varchar arguments, then we might be able to enforce this properly.
+      //if (typeParams == null) {
+      //  throw new RuntimeException("varchar type used without type params");
+      //}
+      hc = new HiveVarcharWritable();
+    }
+
+    @Override
+    public Object convert(Object input) {
+      switch (inputOI.getPrimitiveCategory()) {
+        case BOOLEAN:
+          return outputOI.set(hc,
+              ((BooleanObjectInspector) inputOI).get(input) ?
+                  new HiveVarchar("TRUE", -1) : new HiveVarchar("FALSE", -1));
+        default:
+          return outputOI.set(hc, PrimitiveObjectInspectorUtils.getHiveVarchar(input, inputOI));
+      }
+    }
+
+  }
 }

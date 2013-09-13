@@ -20,10 +20,12 @@ package org.apache.hadoop.hive.shims;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.security.PrivilegedExceptionAction;
+import java.util.Iterator;
 import java.util.List;
 
 import javax.security.auth.login.LoginException;
@@ -31,6 +33,7 @@ import javax.security.auth.login.LoginException;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.BlockLocation;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
@@ -40,13 +43,19 @@ import org.apache.hadoop.mapred.ClusterStatus;
 import org.apache.hadoop.mapred.InputFormat;
 import org.apache.hadoop.mapred.InputSplit;
 import org.apache.hadoop.mapred.JobConf;
+import org.apache.hadoop.mapred.JobProfile;
+import org.apache.hadoop.mapred.JobStatus;
 import org.apache.hadoop.mapred.RecordReader;
 import org.apache.hadoop.mapred.Reporter;
 import org.apache.hadoop.mapred.RunningJob;
 import org.apache.hadoop.mapred.TaskCompletionEvent;
 import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.JobContext;
+import org.apache.hadoop.mapreduce.JobID;
+import org.apache.hadoop.mapreduce.OutputFormat;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
+import org.apache.hadoop.mapreduce.TaskAttemptID;
+import org.apache.hadoop.mapreduce.TaskID;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.util.Progressable;
 
@@ -197,16 +206,18 @@ public interface HadoopShims {
    */
   public String unquoteHtmlChars(String item);
 
+
+
+  public void closeAllForUGI(UserGroupInformation ugi);
+
   /**
    * Get the UGI that the given job configuration will run as.
    *
    * In secure versions of Hadoop, this simply returns the current
    * access control context's user, ignoring the configuration.
    */
-
-  public void closeAllForUGI(UserGroupInformation ugi);
-
   public UserGroupInformation getUGIForConf(Configuration conf) throws LoginException, IOException;
+
   /**
    * Used by metastore server to perform requested rpc in client context.
    * @param <T>
@@ -217,6 +228,26 @@ public interface HadoopShims {
    */
   public <T> T doAs(UserGroupInformation ugi, PrivilegedExceptionAction<T> pvea) throws
     IOException, InterruptedException;
+
+  /**
+   * Once a delegation token is stored in a file, the location is specified
+   * for a child process that runs hadoop operations, using an environment
+   * variable .
+   * @return Return the name of environment variable used by hadoop to find
+   *  location of token file
+   */
+  public String getTokenFileLocEnvName();
+
+
+  /**
+   * Get delegation token from filesystem and write the token along with
+   * metastore tokens into a file
+   * @param conf
+   * @return Path of the file with token credential
+   * @throws IOException
+   */
+  public Path createDelegationTokenFile(final Configuration conf) throws IOException;
+
 
   /**
    * Used by metastore server to creates UGI object for a remote user.
@@ -287,6 +318,8 @@ public interface HadoopShims {
 
   public TaskAttemptContext newTaskAttemptContext(Configuration conf, final Progressable progressable);
 
+  public TaskAttemptID newTaskAttemptID(JobID jobId, boolean isMap, int taskId, int id);
+
   public JobContext newJobContext(Job job);
 
   /**
@@ -321,11 +354,18 @@ public interface HadoopShims {
   public String getJobLauncherHttpAddress(Configuration conf);
 
 
- /**
-  *  Perform kerberos login using the given principal and keytab
- * @throws IOException
-  */
+  /**
+   *  Perform kerberos login using the given principal and keytab
+   * @throws IOException
+   */
   public void loginUserFromKeytab(String principal, String keytabFile) throws IOException;
+
+  /**
+   * Perform kerberos re-login using the given principal and keytab, to renew
+   * the credentials
+   * @throws IOException
+   */
+  public void reLoginUserFromKeytab() throws IOException;
 
   /**
    * Move the directory/file to trash. In case of the symlinks or mount points, the file is
@@ -364,6 +404,13 @@ public interface HadoopShims {
    */
   UserGroupInformation createProxyUser(String userName) throws IOException;
 
+  /**
+   * The method sets to set the partition file has a different signature between
+   * hadoop versions.
+   * @param jobConf
+   * @param partition
+   */
+  void setTotalOrderPartitionFile(JobConf jobConf, Path partition);
   /**
    * InputSplitShim.
    *
@@ -425,4 +472,94 @@ public interface HadoopShims {
         Class<RecordReader<K, V>> rrClass) throws IOException;
   }
 
+  /**
+   * Get the block locations for the given directory.
+   * @param fs the file system
+   * @param path the directory name to get the status and block locations
+   * @param filter a filter that needs to accept the file (or null)
+   * @return an iterator for the located file status objects
+   * @throws IOException
+   */
+  Iterator<FileStatus> listLocatedStatus(FileSystem fs, Path path,
+                                         PathFilter filter) throws IOException;
+
+  /**
+   * For file status returned by listLocatedStatus, convert them into a list
+   * of block locations.
+   * @param fs the file system
+   * @param status the file information
+   * @return the block locations of the file
+   * @throws IOException
+   */
+  BlockLocation[] getLocations(FileSystem fs,
+                               FileStatus status) throws IOException;
+
+  public HCatHadoopShims getHCatShim();
+  public interface HCatHadoopShims {
+
+    enum PropertyName {CACHE_ARCHIVES, CACHE_FILES, CACHE_SYMLINK}
+
+    public TaskID createTaskID();
+
+    public TaskAttemptID createTaskAttemptID();
+
+    public org.apache.hadoop.mapreduce.TaskAttemptContext createTaskAttemptContext(Configuration conf,
+                                                                                   TaskAttemptID taskId);
+
+    public org.apache.hadoop.mapred.TaskAttemptContext createTaskAttemptContext(JobConf conf,
+                                                                                org.apache.hadoop.mapred.TaskAttemptID taskId, Progressable progressable);
+
+    public JobContext createJobContext(Configuration conf, JobID jobId);
+
+    public org.apache.hadoop.mapred.JobContext createJobContext(JobConf conf, JobID jobId, Progressable progressable);
+
+    public void commitJob(OutputFormat outputFormat, Job job) throws IOException;
+
+    public void abortJob(OutputFormat outputFormat, Job job) throws IOException;
+
+    /* Referring to job tracker in 0.20 and resource manager in 0.23 */
+    public InetSocketAddress getResourceManagerAddress(Configuration conf);
+
+    public String getPropertyName(PropertyName name);
+
+    /**
+     * Checks if file is in HDFS filesystem.
+     *
+     * @param fs
+     * @param path
+     * @return true if the file is in HDFS, false if the file is in other file systems.
+     */
+    public boolean isFileInHDFS(FileSystem fs, Path path) throws IOException;
+  }
+  /**
+   * Provides a Hadoop JobTracker shim.
+   * @param conf not {@code null}
+   */
+  public WebHCatJTShim getWebHCatShim(Configuration conf, UserGroupInformation ugi) throws IOException;
+  public interface WebHCatJTShim {
+    /**
+     * Grab a handle to a job that is already known to the JobTracker.
+     *
+     * @return Profile of the job, or null if not found.
+     */
+    public JobProfile getJobProfile(org.apache.hadoop.mapred.JobID jobid) throws IOException;
+    /**
+     * Grab a handle to a job that is already known to the JobTracker.
+     *
+     * @return Status of the job, or null if not found.
+     */
+    public JobStatus getJobStatus(org.apache.hadoop.mapred.JobID jobid) throws IOException;
+    /**
+     * Kill a job.
+     */
+    public void killJob(org.apache.hadoop.mapred.JobID jobid) throws IOException;
+    /**
+     * Get all the jobs submitted.
+     */
+    public JobStatus[] getAllJobs() throws IOException;
+    /**
+     * Close the connection to the Job Tracker.
+     */
+    public void close();
+  }
 }

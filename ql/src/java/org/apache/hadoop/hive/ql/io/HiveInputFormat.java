@@ -36,8 +36,9 @@ import org.apache.hadoop.hive.io.HiveIOExceptionHandlerUtil;
 import org.apache.hadoop.hive.ql.exec.Operator;
 import org.apache.hadoop.hive.ql.exec.TableScanOperator;
 import org.apache.hadoop.hive.ql.exec.Utilities;
+import org.apache.hadoop.hive.ql.log.PerfLogger;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
-import org.apache.hadoop.hive.ql.plan.MapredWork;
+import org.apache.hadoop.hive.ql.plan.MapWork;
 import org.apache.hadoop.hive.ql.plan.OperatorDesc;
 import org.apache.hadoop.hive.ql.plan.PartitionDesc;
 import org.apache.hadoop.hive.ql.plan.TableScanDesc;
@@ -249,15 +250,16 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
   }
 
   protected Map<String, PartitionDesc> pathToPartitionInfo;
-  MapredWork mrwork = null;
+  MapWork mrwork = null;
 
   protected void init(JobConf job) {
-    mrwork = Utilities.getMapRedWork(job);
+    mrwork = Utilities.getMapWork(job);
     pathToPartitionInfo = mrwork.getPathToPartitionInfo();
   }
 
   public InputSplit[] getSplits(JobConf job, int numSplits) throws IOException {
-
+    PerfLogger perfLogger = PerfLogger.getPerfLogger();
+    perfLogger.PerfLogBegin(LOG, PerfLogger.GET_SPLITS);
     init(job);
 
     Path[] dirs = FileInputFormat.getInputPaths(job);
@@ -296,7 +298,7 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
     }
 
     LOG.info("number of splits " + result.size());
-
+    perfLogger.PerfLogEnd(LOG, PerfLogger.GET_SPLITS);
     return result.toArray(new HiveInputSplit[result.size()]);
   }
 
@@ -428,6 +430,8 @@ public class HiveInputFormat<K extends WritableComparable, V extends Writable>
         } else {
           ColumnProjectionUtils.setFullyReadColumns(jobConf);
         }
+        ColumnProjectionUtils.appendReadColumnNames(jobConf,
+            tableScan.getNeededColumns());
 
         pushFilters(jobConf, tableScan);
       }

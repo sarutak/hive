@@ -47,7 +47,7 @@ public class PartitionDesc implements Serializable, Cloneable {
   private java.util.Properties properties;
   private String serdeClassName;
 
-  private transient String baseFileName;
+  private String baseFileName;
 
   public void setBaseFileName(String baseFileName) {
     this.baseFileName = baseFileName;
@@ -74,7 +74,7 @@ public class PartitionDesc implements Serializable, Cloneable {
     this.inputFileFormatClass = inputFileFormatClass;
     if (outputFormat != null) {
       outputFileFormatClass = HiveFileFormatUtils
-          .getOutputFormatSubstitute(outputFormat);
+          .getOutputFormatSubstitute(outputFormat,false);
     }
     if (serdeClassName != null) {
       this.serdeClassName = serdeClassName;
@@ -177,7 +177,7 @@ public class PartitionDesc implements Serializable, Cloneable {
 
   public void setOutputFileFormatClass(final Class<?> outputFileFormatClass) {
     this.outputFileFormatClass = HiveFileFormatUtils
-        .getOutputFormatSubstitute(outputFileFormatClass);
+        .getOutputFormatSubstitute(outputFileFormatClass,false);
   }
 
   @Explain(displayName = "properties", normalExplain = false)
@@ -279,7 +279,7 @@ public class PartitionDesc implements Serializable, Cloneable {
    * @param path
    *          URI to the partition file
    */
-  void deriveBaseFileName(String path) {
+  public void deriveBaseFileName(String path) {
     PlanUtils.configureInputJobPropertiesForStorageHandler(tableDesc);
 
     if (path == null) {

@@ -23,7 +23,7 @@ import java.lang.reflect.Method;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -39,19 +39,23 @@ import javax.xml.parsers.DocumentBuilderFactory;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.apache.hadoop.hive.common.type.HiveVarchar;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.parse.SemanticException;
 import org.apache.hadoop.hive.ql.plan.ExprNodeDesc;
 import org.apache.hadoop.hive.ql.plan.ExprNodeGenericFuncDesc;
+import org.apache.hadoop.hive.ql.udf.GenericUDFDecode;
+import org.apache.hadoop.hive.ql.udf.GenericUDFEncode;
+import org.apache.hadoop.hive.ql.udf.SettableUDF;
 import org.apache.hadoop.hive.ql.udf.UDAFPercentile;
 import org.apache.hadoop.hive.ql.udf.UDFAbs;
 import org.apache.hadoop.hive.ql.udf.UDFAcos;
 import org.apache.hadoop.hive.ql.udf.UDFAscii;
 import org.apache.hadoop.hive.ql.udf.UDFAsin;
 import org.apache.hadoop.hive.ql.udf.UDFAtan;
+import org.apache.hadoop.hive.ql.udf.UDFBase64;
 import org.apache.hadoop.hive.ql.udf.UDFBin;
 import org.apache.hadoop.hive.ql.udf.UDFCeil;
-import org.apache.hadoop.hive.ql.udf.UDFConcat;
 import org.apache.hadoop.hive.ql.udf.UDFConv;
 import org.apache.hadoop.hive.ql.udf.UDFCos;
 import org.apache.hadoop.hive.ql.udf.UDFDate;
@@ -75,7 +79,6 @@ import org.apache.hadoop.hive.ql.udf.UDFLn;
 import org.apache.hadoop.hive.ql.udf.UDFLog;
 import org.apache.hadoop.hive.ql.udf.UDFLog10;
 import org.apache.hadoop.hive.ql.udf.UDFLog2;
-import org.apache.hadoop.hive.ql.udf.UDFLower;
 import org.apache.hadoop.hive.ql.udf.UDFLpad;
 import org.apache.hadoop.hive.ql.udf.UDFMinute;
 import org.apache.hadoop.hive.ql.udf.UDFMonth;
@@ -122,8 +125,8 @@ import org.apache.hadoop.hive.ql.udf.UDFToShort;
 import org.apache.hadoop.hive.ql.udf.UDFToString;
 import org.apache.hadoop.hive.ql.udf.UDFTrim;
 import org.apache.hadoop.hive.ql.udf.UDFType;
+import org.apache.hadoop.hive.ql.udf.UDFUnbase64;
 import org.apache.hadoop.hive.ql.udf.UDFUnhex;
-import org.apache.hadoop.hive.ql.udf.UDFUpper;
 import org.apache.hadoop.hive.ql.udf.UDFWeekOfYear;
 import org.apache.hadoop.hive.ql.udf.UDFYear;
 import org.apache.hadoop.hive.ql.udf.generic.*;
@@ -145,11 +148,16 @@ import org.apache.hadoop.hive.ql.udf.xml.UDFXPathString;
 import org.apache.hadoop.hive.serde.serdeConstants;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector.Category;
+import org.apache.hadoop.hive.serde2.objectinspector.PrimitiveObjectInspector.PrimitiveCategory;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils;
+import org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorUtils.PrimitiveGrouping;
 import org.apache.hadoop.hive.serde2.typeinfo.ListTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.MapTypeInfo;
+import org.apache.hadoop.hive.serde2.typeinfo.PrimitiveTypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoFactory;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
+import org.apache.hadoop.hive.serde2.typeinfo.VarcharTypeParams;
 import org.apache.hadoop.io.IOUtils;
 import org.apache.hadoop.util.ReflectionUtils;
 import org.w3c.dom.Document;
@@ -184,13 +192,9 @@ public final class FunctionRegistry {
 
   static Map<String, WindowFunctionInfo> windowFunctions = Collections.synchronizedMap(new LinkedHashMap<String, WindowFunctionInfo>());
 
-  /*
-   * UDAFS that only work when the input rows have an order.
-   */
-  public static final HashSet<String> UDAFS_IMPLY_ORDER = new HashSet<String>();
 
   static {
-    registerUDF("concat", UDFConcat.class, false);
+    registerGenericUDF("concat", GenericUDFConcat.class);
     registerUDF("substr", UDFSubstr.class, false);
     registerUDF("substring", UDFSubstr.class, false);
     registerUDF("space", UDFSpace.class, false);
@@ -233,11 +237,16 @@ public final class FunctionRegistry {
     registerUDF("bin", UDFBin.class, false);
     registerUDF("hex", UDFHex.class, false);
     registerUDF("unhex", UDFUnhex.class, false);
+    registerUDF("base64", UDFBase64.class, false);
+    registerUDF("unbase64", UDFUnbase64.class, false);
 
-    registerUDF("upper", UDFUpper.class, false);
-    registerUDF("lower", UDFLower.class, false);
-    registerUDF("ucase", UDFUpper.class, false);
-    registerUDF("lcase", UDFLower.class, false);
+    registerGenericUDF("encode", GenericUDFEncode.class);
+    registerGenericUDF("decode", GenericUDFDecode.class);
+
+    registerGenericUDF("upper", GenericUDFUpper.class);
+    registerGenericUDF("lower", GenericUDFLower.class);
+    registerGenericUDF("ucase", GenericUDFUpper.class);
+    registerGenericUDF("lcase", GenericUDFLower.class);
     registerUDF("trim", UDFTrim.class, false);
     registerUDF("ltrim", UDFLTrim.class, false);
     registerUDF("rtrim", UDFRTrim.class, false);
@@ -343,12 +352,16 @@ public final class FunctionRegistry {
     registerUDF(serdeConstants.STRING_TYPE_NAME, UDFToString.class, false,
         UDFToString.class.getSimpleName());
 
+    registerGenericUDF(serdeConstants.DATE_TYPE_NAME,
+        GenericUDFToDate.class);
     registerGenericUDF(serdeConstants.TIMESTAMP_TYPE_NAME,
         GenericUDFTimestamp.class);
     registerGenericUDF(serdeConstants.BINARY_TYPE_NAME,
         GenericUDFToBinary.class);
     registerGenericUDF(serdeConstants.DECIMAL_TYPE_NAME,
         GenericUDFToDecimal.class);
+    registerGenericUDF(serdeConstants.VARCHAR_TYPE_NAME,
+        GenericUDFToVarchar.class);
 
     // Aggregate functions
     registerGenericUDAF("max", new GenericUDAFMax());
@@ -440,15 +453,6 @@ public final class FunctionRegistry {
     registerWindowFunction(LEAD_FUNC_NAME, new GenericUDAFLead(), false);
     registerWindowFunction(LAG_FUNC_NAME, new GenericUDAFLag(), false);
 
-    UDAFS_IMPLY_ORDER.add("rank");
-    UDAFS_IMPLY_ORDER.add("dense_rank");
-    UDAFS_IMPLY_ORDER.add("percent_rank");
-    UDAFS_IMPLY_ORDER.add("cume_dist");
-    UDAFS_IMPLY_ORDER.add(LEAD_FUNC_NAME);
-    UDAFS_IMPLY_ORDER.add(LAG_FUNC_NAME);
-    UDAFS_IMPLY_ORDER.add("first_value");
-    UDAFS_IMPLY_ORDER.add("last_value");
-
     registerTableFunction(NOOP_TABLE_FUNCTION, NoopResolver.class);
     registerTableFunction(NOOP_MAP_TABLE_FUNCTION, NoopWithMapResolver.class);
     registerTableFunction(WINDOWING_TABLE_FUNCTION,  WindowingTableFunctionResolver.class);
@@ -480,7 +484,7 @@ public final class FunctionRegistry {
       Class<? extends UDF> UDFClass, boolean isOperator, String displayName) {
     if (UDF.class.isAssignableFrom(UDFClass)) {
       FunctionInfo fI = new FunctionInfo(isNative, displayName,
-          new GenericUDFBridge(displayName, isOperator, UDFClass));
+          new GenericUDFBridge(displayName, isOperator, UDFClass.getName()));
       mFunctions.put(functionName.toLowerCase(), fI);
     } else {
       throw new RuntimeException("Registering UDF Class " + UDFClass
@@ -599,24 +603,74 @@ public final class FunctionRegistry {
     return synonyms;
   }
 
-  static Map<TypeInfo, Integer> numericTypes = new HashMap<TypeInfo, Integer>();
-  static List<TypeInfo> numericTypeList = new ArrayList<TypeInfo>();
+  // The ordering of types here is used to determine which numeric types
+  // are common/convertible to one another. Probably better to rely on the
+  // ordering explicitly defined here than to assume that the enum values
+  // that were arbitrarily assigned in PrimitiveCategory work for our purposes.
+  static EnumMap<PrimitiveCategory, Integer> numericTypes =
+      new EnumMap<PrimitiveCategory, Integer>(PrimitiveCategory.class);
+  static List<PrimitiveCategory> numericTypeList = new ArrayList<PrimitiveCategory>();
 
-  static void registerNumericType(String typeName, int level) {
-    TypeInfo t = TypeInfoFactory.getPrimitiveTypeInfo(typeName);
-    numericTypeList.add(t);
-    numericTypes.put(t, level);
+  static void registerNumericType(PrimitiveCategory primitiveCategory, int level) {
+    numericTypeList.add(primitiveCategory);
+    numericTypes.put(primitiveCategory, level);
   }
 
   static {
-    registerNumericType(serdeConstants.TINYINT_TYPE_NAME, 1);
-    registerNumericType(serdeConstants.SMALLINT_TYPE_NAME, 2);
-    registerNumericType(serdeConstants.INT_TYPE_NAME, 3);
-    registerNumericType(serdeConstants.BIGINT_TYPE_NAME, 4);
-    registerNumericType(serdeConstants.FLOAT_TYPE_NAME, 5);
-    registerNumericType(serdeConstants.DOUBLE_TYPE_NAME, 6);
-    registerNumericType(serdeConstants.DECIMAL_TYPE_NAME, 7);
-    registerNumericType(serdeConstants.STRING_TYPE_NAME, 8);
+    registerNumericType(PrimitiveCategory.BYTE, 1);
+    registerNumericType(PrimitiveCategory.SHORT, 2);
+    registerNumericType(PrimitiveCategory.INT, 3);
+    registerNumericType(PrimitiveCategory.LONG, 4);
+    registerNumericType(PrimitiveCategory.FLOAT, 5);
+    registerNumericType(PrimitiveCategory.DOUBLE, 6);
+    registerNumericType(PrimitiveCategory.DECIMAL, 7);
+    registerNumericType(PrimitiveCategory.STRING, 8);
+  }
+
+  static int getCommonLength(int aLen, int bLen) {
+    int maxLength;
+    if (aLen < 0 || bLen < 0) {
+      // negative length should take precedence over positive value?
+      maxLength = -1;
+    } else {
+      maxLength = Math.max(aLen, bLen);
+    }
+    return maxLength;
+  }
+
+  /**
+   * Given 2 TypeInfo types and the PrimitiveCategory selected as the common class between the two,
+   * return a TypeInfo corresponding to the common PrimitiveCategory, and with type qualifiers
+   * (if applicable) that match the 2 TypeInfo types.
+   * Examples:
+   *   varchar(10), varchar(20), primitive category varchar => varchar(20)
+   *   date, string, primitive category string => string
+   * @param a  TypeInfo of the first type
+   * @param b  TypeInfo of the second type
+   * @param typeCategory PrimitiveCategory of the designated common type between a and b
+   * @return TypeInfo represented by the primitive category, with any applicable type qualifiers.
+   */
+  public static TypeInfo getTypeInfoForPrimitiveCategory(
+      PrimitiveTypeInfo a, PrimitiveTypeInfo b, PrimitiveCategory typeCategory) {
+    // For types with parameters (like varchar), we need to determine the type parameters
+    // that should be added to this type, based on the original 2 TypeInfos.
+    switch (typeCategory) {
+      case VARCHAR:
+        int maxLength = getCommonLength(
+            TypeInfoUtils.getCharacterLengthForType(a),
+            TypeInfoUtils.getCharacterLengthForType(b));
+        VarcharTypeParams varcharParams = new VarcharTypeParams();
+        varcharParams.setLength(maxLength);
+        // Generate type name so that we can retrieve the TypeInfo for that type.
+        String typeName = PrimitiveObjectInspectorUtils
+            .getTypeEntryFromTypeSpecs(typeCategory, varcharParams).toString();
+        return TypeInfoFactory.getPrimitiveTypeInfo(typeName);
+
+      default:
+        // Type doesn't require any qualifiers.
+        return TypeInfoFactory.getPrimitiveTypeInfo(
+          PrimitiveObjectInspectorUtils.getTypeEntryFromPrimitiveCategory(typeCategory).typeName);
+    }
   }
 
   /**
@@ -626,18 +680,38 @@ public final class FunctionRegistry {
     if (a.equals(b)) {
       return a;
     }
+    if (a.getCategory() != Category.PRIMITIVE || b.getCategory() != Category.PRIMITIVE) {
+      return null;
+    }
+    PrimitiveCategory pcA = ((PrimitiveTypeInfo)a).getPrimitiveCategory();
+    PrimitiveCategory pcB = ((PrimitiveTypeInfo)b).getPrimitiveCategory();
+
+    if (pcA == pcB) {
+      // Same primitive category but different qualifiers.
+      return getTypeInfoForPrimitiveCategory((PrimitiveTypeInfo)a, (PrimitiveTypeInfo)b, pcA);
+    }
+
+    PrimitiveGrouping pgA = PrimitiveObjectInspectorUtils.getPrimitiveGrouping(pcA);
+    PrimitiveGrouping pgB = PrimitiveObjectInspectorUtils.getPrimitiveGrouping(pcB);
+    // handle string types properly
+    if (pgA == PrimitiveGrouping.STRING_GROUP && pgB == PrimitiveGrouping.STRING_GROUP) {
+      return getTypeInfoForPrimitiveCategory(
+          (PrimitiveTypeInfo)a, (PrimitiveTypeInfo)b,PrimitiveCategory.STRING);
+    }
+
     if (FunctionRegistry.implicitConvertable(a, b)) {
-      return b;
+      return getTypeInfoForPrimitiveCategory((PrimitiveTypeInfo)a, (PrimitiveTypeInfo)b, pcB);
     }
     if (FunctionRegistry.implicitConvertable(b, a)) {
-      return a;
+      return getTypeInfoForPrimitiveCategory((PrimitiveTypeInfo)a, (PrimitiveTypeInfo)b, pcA);
     }
-    for (TypeInfo t : numericTypeList) {
-      if (FunctionRegistry.implicitConvertable(a, t)
-          && FunctionRegistry.implicitConvertable(b, t)) {
-        return t;
+    for (PrimitiveCategory t : numericTypeList) {
+      if (FunctionRegistry.implicitConvertable(pcA, t)
+          && FunctionRegistry.implicitConvertable(pcB, t)) {
+        return getTypeInfoForPrimitiveCategory((PrimitiveTypeInfo)a, (PrimitiveTypeInfo)b, t);
       }
     }
+
     return null;
   }
 
@@ -655,12 +729,34 @@ public final class FunctionRegistry {
     if (a.equals(b)) {
       return a;
     }
-    for (TypeInfo t : numericTypeList) {
-      if (FunctionRegistry.implicitConvertable(a, t)
-          && FunctionRegistry.implicitConvertable(b, t)) {
-        return t;
+    if (a.getCategory() != Category.PRIMITIVE || b.getCategory() != Category.PRIMITIVE) {
+      return null;
+    }
+    PrimitiveCategory pcA = ((PrimitiveTypeInfo)a).getPrimitiveCategory();
+    PrimitiveCategory pcB = ((PrimitiveTypeInfo)b).getPrimitiveCategory();
+
+    if (pcA == pcB) {
+      // Same primitive category but different qualifiers.
+      // Rely on getTypeInfoForPrimitiveCategory() to sort out the type params.
+      return getTypeInfoForPrimitiveCategory((PrimitiveTypeInfo)a, (PrimitiveTypeInfo)b, pcA);
+    }
+
+    PrimitiveGrouping pgA = PrimitiveObjectInspectorUtils.getPrimitiveGrouping(pcA);
+    PrimitiveGrouping pgB = PrimitiveObjectInspectorUtils.getPrimitiveGrouping(pcB);
+    // handle string types properly
+    if (pgA == PrimitiveGrouping.STRING_GROUP && pgB == PrimitiveGrouping.STRING_GROUP) {
+      // Compare as strings. Char comparison semantics may be different if/when implemented.
+      return getTypeInfoForPrimitiveCategory(
+          (PrimitiveTypeInfo)a, (PrimitiveTypeInfo)b,PrimitiveCategory.STRING);
+    }
+
+    for (PrimitiveCategory t : numericTypeList) {
+      if (FunctionRegistry.implicitConvertable(pcA, t)
+          && FunctionRegistry.implicitConvertable(pcB, t)) {
+        return getTypeInfoForPrimitiveCategory((PrimitiveTypeInfo)a, (PrimitiveTypeInfo)b, t);
       }
     }
+
     return null;
   }
 
@@ -676,40 +772,60 @@ public final class FunctionRegistry {
     if (a.equals(b)) {
       return a;
     }
-    Integer ai = numericTypes.get(a);
-    Integer bi = numericTypes.get(b);
+    if (a.getCategory() != Category.PRIMITIVE || b.getCategory() != Category.PRIMITIVE) {
+      return null;
+    }
+    PrimitiveCategory pcA = ((PrimitiveTypeInfo)a).getPrimitiveCategory();
+    PrimitiveCategory pcB = ((PrimitiveTypeInfo)b).getPrimitiveCategory();
+
+    PrimitiveGrouping pgA = PrimitiveObjectInspectorUtils.getPrimitiveGrouping(pcA);
+    PrimitiveGrouping pgB = PrimitiveObjectInspectorUtils.getPrimitiveGrouping(pcB);
+    // handle string types properly
+    if (pgA == PrimitiveGrouping.STRING_GROUP && pgB == PrimitiveGrouping.STRING_GROUP) {
+      return getTypeInfoForPrimitiveCategory(
+          (PrimitiveTypeInfo)a, (PrimitiveTypeInfo)b,PrimitiveCategory.STRING);
+    }
+
+    Integer ai = numericTypes.get(pcA);
+    Integer bi = numericTypes.get(pcB);
     if (ai == null || bi == null) {
       // If either is not a numeric type, return null.
       return null;
     }
-    return (ai > bi) ? a : b;
+    PrimitiveCategory pcCommon = (ai > bi) ? pcA : pcB;
+    return getTypeInfoForPrimitiveCategory((PrimitiveTypeInfo)a, (PrimitiveTypeInfo)b, pcCommon);
   }
 
-  /**
-   * Returns whether it is possible to implicitly convert an object of Class
-   * from to Class to.
-   */
-  public static boolean implicitConvertable(TypeInfo from, TypeInfo to) {
-    if (from.equals(to)) {
+  public static boolean implicitConvertable(PrimitiveCategory from, PrimitiveCategory to) {
+    if (from == to) {
       return true;
     }
+
+    PrimitiveGrouping fromPg = PrimitiveObjectInspectorUtils.getPrimitiveGrouping(from);
+    PrimitiveGrouping toPg = PrimitiveObjectInspectorUtils.getPrimitiveGrouping(to);
+
     // Allow implicit String to Double conversion
-    if (from.equals(TypeInfoFactory.stringTypeInfo)
-        && to.equals(TypeInfoFactory.doubleTypeInfo)) {
+    if (fromPg == PrimitiveGrouping.STRING_GROUP && to == PrimitiveCategory.DOUBLE) {
       return true;
     }
     // Allow implicit String to Decimal conversion
-    if (from.equals(TypeInfoFactory.stringTypeInfo)
-        && to.equals(TypeInfoFactory.decimalTypeInfo)) {
+    if (fromPg == PrimitiveGrouping.STRING_GROUP && to == PrimitiveCategory.DECIMAL) {
       return true;
     }
     // Void can be converted to any type
-    if (from.equals(TypeInfoFactory.voidTypeInfo)) {
+    if (from == PrimitiveCategory.VOID) {
       return true;
     }
-
-    if (from.equals(TypeInfoFactory.timestampTypeInfo)
-        && to.equals(TypeInfoFactory.stringTypeInfo)) {
+    // Allow implicit String to Date conversion
+    if (fromPg == PrimitiveGrouping.DATE_GROUP && toPg == PrimitiveGrouping.STRING_GROUP) {
+      return true;
+    }
+    // Allow implicit Numeric to String conversion
+    if (fromPg == PrimitiveGrouping.NUMERIC_GROUP && toPg == PrimitiveGrouping.STRING_GROUP) {
+      return true;
+    }
+    // Allow implicit String to varchar conversion, and vice versa
+    if (fromPg == PrimitiveGrouping.STRING_GROUP && toPg == PrimitiveGrouping.STRING_GROUP) {
       return true;
     }
 
@@ -724,6 +840,26 @@ public final class FunctionRegistry {
       return false;
     }
     return true;
+  }
+
+  /**
+   * Returns whether it is possible to implicitly convert an object of Class
+   * from to Class to.
+   */
+  public static boolean implicitConvertable(TypeInfo from, TypeInfo to) {
+    if (from.equals(to)) {
+      return true;
+    }
+
+    // Reimplemented to use PrimitiveCategory rather than TypeInfo, because
+    // 2 TypeInfos from the same qualified type (varchar, decimal) should still be
+    // seen as equivalent.
+    if (from.getCategory() == Category.PRIMITIVE && to.getCategory() == Category.PRIMITIVE) {
+      return implicitConvertable(
+          ((PrimitiveTypeInfo)from).getPrimitiveCategory(),
+          ((PrimitiveTypeInfo)to).getPrimitiveCategory());
+    }
+    return false;
   }
 
   /**
@@ -904,7 +1040,8 @@ public final class FunctionRegistry {
    */
   public static int matchCost(TypeInfo argumentPassed,
       TypeInfo argumentAccepted, boolean exact) {
-    if (argumentAccepted.equals(argumentPassed)) {
+    if (argumentAccepted.equals(argumentPassed)
+        || TypeInfoUtils.doPrimitiveCategoriesMatch(argumentPassed, argumentAccepted)) {
       // matches
       return 0;
     }
@@ -950,6 +1087,59 @@ public final class FunctionRegistry {
     }
 
     return -1;
+  }
+
+  /**
+   * Given a set of candidate methods and list of argument types, try to
+   * select the best candidate based on how close the passed argument types are
+   * to the candidate argument types.
+   * For a varchar argument, we would prefer evaluate(string) over evaluate(double).
+   * @param udfMethods  list of candidate methods
+   * @param argumentsPassed list of argument types to match to the candidate methods
+   */
+  static void filterMethodsByTypeAffinity(List<Method> udfMethods, List<TypeInfo> argumentsPassed) {
+    if (udfMethods.size() > 1) {
+      // Prefer methods with a closer signature based on the primitive grouping of each argument.
+      // Score each method based on its similarity to the passed argument types.
+      int currentScore = 0;
+      int bestMatchScore = 0;
+      Method bestMatch = null;
+      for (Method m: udfMethods) {
+        currentScore = 0;
+        List<TypeInfo> argumentsAccepted =
+            TypeInfoUtils.getParameterTypeInfos(m, argumentsPassed.size());
+        Iterator<TypeInfo> argsPassedIter = argumentsPassed.iterator();
+        for (TypeInfo acceptedType : argumentsAccepted) {
+          // Check the affinity of the argument passed in with the accepted argument,
+          // based on the PrimitiveGrouping
+          TypeInfo passedType = argsPassedIter.next();
+          if (acceptedType.getCategory() == Category.PRIMITIVE
+              && passedType.getCategory() == Category.PRIMITIVE) {
+            PrimitiveGrouping acceptedPg = PrimitiveObjectInspectorUtils.getPrimitiveGrouping(
+                ((PrimitiveTypeInfo) acceptedType).getPrimitiveCategory());
+            PrimitiveGrouping passedPg = PrimitiveObjectInspectorUtils.getPrimitiveGrouping(
+                ((PrimitiveTypeInfo) passedType).getPrimitiveCategory());
+            if (acceptedPg == passedPg) {
+              // The passed argument matches somewhat closely with an accepted argument
+              ++currentScore;
+            }
+          }
+        }
+        // Check if the score for this method is any better relative to others
+        if (currentScore > bestMatchScore) {
+          bestMatchScore = currentScore;
+          bestMatch = m;
+        } else if (currentScore == bestMatchScore) {
+          bestMatch = null; // no longer a best match if more than one.
+        }
+      }
+
+      if (bestMatch != null) {
+        // Found a best match during this processing, use it.
+        udfMethods.clear();
+        udfMethods.add(bestMatch);
+      }
+    }
   }
 
   /**
@@ -1022,6 +1212,13 @@ public final class FunctionRegistry {
       // No matching methods found
       throw new NoMatchingMethodException(udfClass, argumentsPassed, mlist);
     }
+
+    if (udfMethods.size() > 1) {
+      // First try selecting methods based on the type affinity of the arguments passed
+      // to the candidate method arguments.
+      filterMethodsByTypeAffinity(udfMethods, argumentsPassed);
+    }
+
     if (udfMethods.size() > 1) {
 
       // if the only difference is numeric types, pick the method
@@ -1047,9 +1244,15 @@ public final class FunctionRegistry {
         for (TypeInfo accepted: argumentsAccepted) {
           TypeInfo reference = referenceIterator.next();
 
-          if (numericTypes.containsKey(accepted)) {
+          boolean acceptedIsPrimitive = false;
+          PrimitiveCategory acceptedPrimCat = PrimitiveCategory.UNKNOWN;
+          if (accepted.getCategory() == Category.PRIMITIVE) {
+            acceptedIsPrimitive = true;
+            acceptedPrimCat = ((PrimitiveTypeInfo) accepted).getPrimitiveCategory();
+          }
+          if (acceptedIsPrimitive && numericTypes.containsKey(acceptedPrimCat)) {
             // We're looking for the udf with the smallest maximum numeric type.
-            int typeValue = numericTypes.get(accepted);
+            int typeValue = numericTypes.get(acceptedPrimCat);
             maxNumericType = typeValue > maxNumericType ? typeValue : maxNumericType;
           } else if (!accepted.equals(reference)) {
             // There are non-numeric arguments that don't match from one UDF to
@@ -1101,18 +1304,38 @@ public final class FunctionRegistry {
       return null;
     }
 
+    GenericUDF clonedUDF = null;
     if (genericUDF instanceof GenericUDFBridge) {
       GenericUDFBridge bridge = (GenericUDFBridge) genericUDF;
-      return new GenericUDFBridge(bridge.getUdfName(), bridge.isOperator(),
-          bridge.getUdfClass());
+      clonedUDF = new GenericUDFBridge(bridge.getUdfName(), bridge.isOperator(),
+          bridge.getUdfClassName());
     } else if (genericUDF instanceof GenericUDFMacro) {
       GenericUDFMacro bridge = (GenericUDFMacro) genericUDF;
-      return new GenericUDFMacro(bridge.getMacroName(), bridge.getBody(),
+      clonedUDF = new GenericUDFMacro(bridge.getMacroName(), bridge.getBody(),
           bridge.getColNames(), bridge.getColTypes());
+    } else {
+      clonedUDF = (GenericUDF) ReflectionUtils
+          .newInstance(genericUDF.getClass(), null);
     }
 
-    return (GenericUDF) ReflectionUtils
-        .newInstance(genericUDF.getClass(), null);
+    if (clonedUDF != null) {
+      // The original may have settable info that needs to be added to the new copy.
+      if (genericUDF instanceof SettableUDF) {
+        try {
+          Object settableData = ((SettableUDF)genericUDF).getParams();
+          if (settableData != null) {
+            ((SettableUDF)clonedUDF).setParams(settableData);
+          }
+        } catch (UDFArgumentException err) {
+          // In theory this should not happen - if the original copy of the UDF had this
+          // data, we should be able to set the UDF copy with this same settableData.
+          LOG.error("Unable to add settable data to UDF " + genericUDF.getClass());
+          throw new IllegalArgumentException(err);
+        }
+      }
+    }
+
+    return clonedUDF;
   }
 
   /**
@@ -1267,7 +1490,9 @@ public final class FunctionRegistry {
         udfClass == UDFToDouble.class || udfClass == UDFToFloat.class ||
         udfClass == UDFToInteger.class || udfClass == UDFToLong.class ||
         udfClass == UDFToShort.class || udfClass == UDFToString.class ||
-        udfClass == GenericUDFTimestamp.class || udfClass == GenericUDFToBinary.class;
+        udfClass == GenericUDFToVarchar.class ||
+        udfClass == GenericUDFTimestamp.class || udfClass == GenericUDFToBinary.class ||
+        udfClass == GenericUDFToDate.class;
   }
 
   /**
@@ -1423,8 +1648,30 @@ public final class FunctionRegistry {
     return windowFunctions.get(name.toLowerCase());
   }
 
+  /**
+   * Both UDF and UDAF functions can imply order for analytical functions
+   *
+   * @param name
+   *          name of function
+   * @return true if a GenericUDF or GenericUDAF exists for this name and implyOrder is true, false
+   *         otherwise.
+   */
   public static boolean impliesOrder(String functionName) {
-    return functionName == null ? false : UDAFS_IMPLY_ORDER.contains(functionName.toLowerCase());
+
+    FunctionInfo info = mFunctions.get(functionName.toLowerCase());
+    if (info != null) {
+      if (info.isGenericUDF()) {
+        UDFType type = info.getGenericUDF().getClass().getAnnotation(UDFType.class);
+        if (type != null) {
+          return type.impliesOrder();
+        }
+      }
+    }
+    WindowFunctionInfo windowInfo = windowFunctions.get(functionName.toLowerCase());
+    if (windowInfo != null) {
+      return windowInfo.isImpliesOrder();
+    }
+    return false;
   }
 
   static void registerHiveUDAFsAsWindowFunctions()
@@ -1472,4 +1719,23 @@ public final class FunctionRegistry {
     mFunctions.put(name.toLowerCase(), tInfo);
   }
 
+  /**
+   * Use this to check if function is ranking function
+   *
+   * @param name
+   *          name of a function
+   * @return true if function is a UDAF, has WindowFunctionDescription annotation and the annotations
+   *         confirms a ranking function, false otherwise
+   */
+  public static boolean isRankingFunction(String name){
+    FunctionInfo info = mFunctions.get(name.toLowerCase());
+    GenericUDAFResolver res = info.getGenericUDAFResolver();
+    if (res != null){
+      WindowFunctionDescription desc = res.getClass().getAnnotation(WindowFunctionDescription.class);
+      if (desc != null){
+        return desc.rankingFunction();
+      }
+    }
+    return false;
+  }
 }

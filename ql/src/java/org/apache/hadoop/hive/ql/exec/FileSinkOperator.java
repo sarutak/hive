@@ -34,11 +34,11 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.common.FileUtils;
-import org.apache.hadoop.hive.metastore.api.SkewedValueList;
 import org.apache.hadoop.hive.ql.ErrorMsg;
 import org.apache.hadoop.hive.ql.io.HiveFileFormatUtils;
 import org.apache.hadoop.hive.ql.io.HiveKey;
 import org.apache.hadoop.hive.ql.io.HiveOutputFormat;
+import org.apache.hadoop.hive.ql.io.HivePassThroughOutputFormat;
 import org.apache.hadoop.hive.ql.io.HivePartitioner;
 import org.apache.hadoop.hive.ql.metadata.HiveException;
 import org.apache.hadoop.hive.ql.plan.DynamicPartitionCtx;
@@ -709,7 +709,7 @@ public class FileSinkOperator extends TerminalOperator<FileSinkDesc> implements
     List<String> skewedCols = lbCtx.getSkewedColNames();
     List<List<String>> allSkewedVals = lbCtx.getSkewedColValues();
     List<String> skewedValsCandidate = null;
-    Map<SkewedValueList, String> locationMap = lbCtx.getLbLocationMap();
+    Map<List<String>, String> locationMap = lbCtx.getLbLocationMap();
 
     /* Convert input row to standard objects. */
     ObjectInspectorUtils.copyToStandardObject(standObjs, row,
@@ -727,14 +727,14 @@ public class FileSinkOperator extends TerminalOperator<FileSinkDesc> implements
     if (allSkewedVals.contains(skewedValsCandidate)) {
       /* matches skewed values. */
       lbDirName = FileUtils.makeListBucketingDirName(skewedCols, skewedValsCandidate);
-      locationMap.put(new SkewedValueList(skewedValsCandidate), lbDirName);
+      locationMap.put(skewedValsCandidate, lbDirName);
     } else {
       /* create default directory. */
       lbDirName = FileUtils.makeDefaultListBucketingDirName(skewedCols,
           lbCtx.getDefaultDirName());
       List<String> defaultKey = Arrays.asList(lbCtx.getDefaultKey());
       if (!locationMap.containsKey(defaultKey)) {
-        locationMap.put(new SkewedValueList(defaultKey), lbDirName);
+        locationMap.put(defaultKey, lbDirName);
       }
     }
     return lbDirName;
@@ -927,7 +927,19 @@ public class FileSinkOperator extends TerminalOperator<FileSinkDesc> implements
   public void checkOutputSpecs(FileSystem ignored, JobConf job) throws IOException {
     if (hiveOutputFormat == null) {
       try {
-        hiveOutputFormat = conf.getTableInfo().getOutputFileFormatClass().newInstance();
+        if (getConf().getTableInfo().getJobProperties() != null) {
+             //Setting only for Storage Handler
+             if (getConf().getTableInfo().getJobProperties().get(HivePassThroughOutputFormat.HIVE_PASSTHROUGH_STORAGEHANDLER_OF_JOBCONFKEY) != null) {
+                 job.set(HivePassThroughOutputFormat.HIVE_PASSTHROUGH_STORAGEHANDLER_OF_JOBCONFKEY,getConf().getTableInfo().getJobProperties().get(HivePassThroughOutputFormat.HIVE_PASSTHROUGH_STORAGEHANDLER_OF_JOBCONFKEY));
+                 hiveOutputFormat = ReflectionUtils.newInstance(conf.getTableInfo().getOutputFileFormatClass(),job);
+           }
+          else {
+                 hiveOutputFormat = conf.getTableInfo().getOutputFileFormatClass().newInstance(); 
+          }
+        }
+        else {
+              hiveOutputFormat = conf.getTableInfo().getOutputFileFormatClass().newInstance();
+        }
       } catch (Exception ex) {
         throw new IOException(ex);
       }

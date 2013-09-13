@@ -117,7 +117,10 @@ public class GenMRTableScan1 implements NodeProcessor {
             handlePartialScanCommand(op, ctx, parseCtx, currTask, parseInfo, statsWork, statsTask);
           }
 
-          currWork.setGatheringStats(true);
+          currWork.getMapWork().setGatheringStats(true);
+          if (currWork.getReduceWork() != null) {
+            currWork.getReduceWork().setGatheringStats(true);
+          }
           // NOTE: here we should use the new partition predicate pushdown API to get a list of pruned list,
           // and pass it to setTaskPlan as the last parameter
           Set<Partition> confirmedPartns = new HashSet<Partition>();
@@ -137,8 +140,7 @@ public class GenMRTableScan1 implements NodeProcessor {
           }
           if (confirmedPartns.size() > 0) {
             Table source = parseCtx.getQB().getMetaData().getTableForAlias(alias);
-            PrunedPartitionList partList = new PrunedPartitionList(source, confirmedPartns,
-                new HashSet<Partition>(), null);
+            PrunedPartitionList partList = new PrunedPartitionList(source, confirmedPartns, false);
             GenMapRedUtils.setTaskPlan(currAliasId, currTopOp, currTask, false, ctx, partList);
           } else { // non-partitioned table
             GenMapRedUtils.setTaskPlan(currAliasId, currTopOp, currTask, false, ctx);
