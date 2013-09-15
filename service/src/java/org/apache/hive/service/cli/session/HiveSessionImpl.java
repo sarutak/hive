@@ -184,14 +184,19 @@ public class HiveSessionImpl implements HiveSession {
       boolean runAsync)
       throws HiveSQLException {
     acquire();
+    OperationHandle opHandle = null;
     try {
       ExecuteStatementOperation operation = getOperationManager()
           .newExecuteStatementOperation(getSession(), statement, confOverlay, runAsync);
+
+      opHandle = operation.getHandle();
       operation.run();
-      OperationHandle opHandle = operation.getHandle();
-      opHandleSet.add(opHandle);
+
       return opHandle;
     } finally {
+      if (opHandle != null) {
+        opHandleSet.add(opHandle);
+      }
       release();
     }
   }

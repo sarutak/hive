@@ -181,17 +181,19 @@ public class HiveStatement implements java.sql.Statement {
       throw new SQLException("Can't execute after statement has been closed");
     }
 
+    TExecuteStatementResp execResp = null;
     try {
       closeClientOperation();
       TExecuteStatementReq execReq = new TExecuteStatementReq(sessHandle, sql);
       execReq.setConfOverlay(sessConf);
-      TExecuteStatementResp execResp = client.ExecuteStatement(execReq);
+      execResp = client.ExecuteStatement(execReq);
       Utils.verifySuccessWithInfo(execResp.getStatus());
-      stmtHandle = execResp.getOperationHandle();
     } catch (SQLException eS) {
       throw eS;
     } catch (Exception ex) {
       throw new SQLException(ex.toString(), "08S01", ex);
+    } finally {
+      stmtHandle = execResp.getOperationHandle();
     }
 
     if (!stmtHandle.isHasResultSet()) {
