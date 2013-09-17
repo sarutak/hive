@@ -79,13 +79,14 @@ public class ImportSemanticAnalyzer extends BaseSemanticAnalyzer {
 
   @Override
   public void analyzeInternal(ASTNode ast) throws SemanticException {
+      FileSystem fs = null;
     try {
       Tree fromTree = ast.getChild(0);
       // initialize load path
       String tmpPath = stripQuotes(fromTree.getText());
       URI fromURI = EximUtil.getValidatedURI(conf, tmpPath);
 
-      FileSystem fs = FileSystem.get(fromURI, conf);
+      fs = FileSystem.get(fromURI, conf);
       String dbname = null;
       CreateTableDesc tblDesc = null;
       List<AddPartitionDesc> partitionDescs = new ArrayList<AddPartitionDesc>();
@@ -276,6 +277,14 @@ public class ImportSemanticAnalyzer extends BaseSemanticAnalyzer {
       throw e;
     } catch (Exception e) {
       throw new SemanticException(ErrorMsg.GENERIC_ERROR.getMsg(), e);
+    } finally {
+      if (fs != null) {
+        try {
+          fs.close();
+        } catch (IOException e) {
+            throw new SemanticException(e);
+	}
+      }
     }
   }
 

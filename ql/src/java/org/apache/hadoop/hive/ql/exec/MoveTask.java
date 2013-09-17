@@ -248,7 +248,7 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
           // Get all files from the src directory
           FileStatus[] dirs;
           ArrayList<FileStatus> files;
-          FileSystem fs;
+          FileSystem fs = null;
           try {
             fs = FileSystem.get(table.getDataLocation(), conf);
             dirs = fs.globStatus(new Path(tbd.getSourceDir()));
@@ -264,6 +264,10 @@ public class MoveTask extends Task<MoveWork> implements Serializable {
           } catch (IOException e) {
             throw new HiveException(
                 "addFiles: filesystem error in check phase", e);
+          } finally {
+	    if (fs != null) {
+	      fs.close();
+	    }
           }
           if (HiveConf.getBoolVar(conf, HiveConf.ConfVars.HIVECHECKFILEFORMAT)) {
             // Check if the file format of the file matches that of the table.

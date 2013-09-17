@@ -185,10 +185,12 @@ class HBaseBulkOutputFormat extends HBaseBaseOutputFormat {
     public void commitJob(JobContext jobContext) throws IOException {
       baseOutputCommitter.commitJob(jobContext);
       RevisionManager rm = null;
+      FileSystem fs = null;
       try {
         Configuration conf = jobContext.getConfiguration();
         Path srcPath = FileOutputFormat.getOutputPath(jobContext.getJobConf());
-        if (!FileSystem.get(conf).exists(srcPath)) {
+        fs = FileSystem.get(conf);
+        if (!fs.exists(srcPath)) {
           throw new IOException("Failed to bulk import hfiles. " +
             "Intermediate data directory is cleaned up or missing. " +
             "Please look at the bulk import job if it exists for failure reason");
@@ -209,13 +211,22 @@ class HBaseBulkOutputFormat extends HBaseBaseOutputFormat {
       } finally {
         if (rm != null)
           rm.close();
+        if (fs != null)
+          fs.close();
       }
     }
 
     private void cleanIntermediate(JobContext jobContext)
       throws IOException {
-      FileSystem fs = FileSystem.get(jobContext.getConfiguration());
-      fs.delete(FileOutputFormat.getOutputPath(jobContext.getJobConf()), true);
+      FileSystem fs = null;
+      try {
+        fs = FileSystem.get(jobContext.getConfiguration());
+	fs.delete(FileOutputFormat.getOutputPath(jobContext.getJobConf()), true);
+      } finally {
+        if (fs != null) {
+          fs.close();
+	}
+      }
     }
   }
 }

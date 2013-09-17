@@ -630,8 +630,9 @@ public class SessionState {
       if (!resourceDir.exists() && !resourceDir.mkdirs()) {
         throw new RuntimeException("Couldn't create directory " + resourceDir);
       }
+      FileSystem fs = null;
       try {
-        FileSystem fs = FileSystem.get(new URI(value), conf);
+        fs = FileSystem.get(new URI(value), conf);
         fs.copyToLocalFile(new Path(value), new Path(destinationFile.getCanonicalPath()));
         value = destinationFile.getCanonicalPath();
         if (convertToUnix && DosToUnix.isWindowsScript(destinationFile)) {
@@ -644,6 +645,14 @@ public class SessionState {
         }
       } catch (Exception e) {
         throw new RuntimeException("Failed to read external resource " + value, e);
+      } finally {
+	if (fs != null) {
+	  try {
+	    fs.close();
+          } catch (IOException e) {
+	    throw new RuntimeException("Failed to close FileSystem");
+	  }
+	}
       }
     }
     return value;

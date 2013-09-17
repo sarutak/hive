@@ -646,12 +646,20 @@ public class Table implements Serializable {
    *          Files to be moved. Leaf directories or globbed file paths
    */
   protected void copyFiles(Path srcf) throws HiveException {
-    FileSystem fs;
+    FileSystem fs = null;
     try {
       fs = FileSystem.get(getDataLocation(), Hive.get().getConf());
       Hive.copyFiles(Hive.get().getConf(), srcf, new Path(getDataLocation().getPath()), fs);
     } catch (IOException e) {
       throw new HiveException("addFiles: filesystem error in check phase", e);
+    } finally {
+      if (fs != null) {
+        try {
+          fs.close();
+        } catch (IOException e) {
+          throw new HiveException("Failed to close FileSystem", e);
+        }
+      }
     }
   }
 
@@ -940,10 +948,11 @@ public class Table implements Serializable {
 
   @SuppressWarnings("nls")
   public FileStatus[] getSortedPaths() {
+    FileSystem fs = null;
     try {
       // Previously, this got the filesystem of the Table, which could be
       // different from the filesystem of the partition.
-      FileSystem fs = FileSystem.get(getPath().toUri(), Hive.get()
+      fs = FileSystem.get(getPath().toUri(), Hive.get()
           .getConf());
       String pathPattern = getPath().toString();
       if (getNumBuckets() > 0) {
@@ -961,6 +970,14 @@ public class Table implements Serializable {
       return srcs;
     } catch (Exception e) {
       throw new RuntimeException("Cannot get path ", e);
+    } finally {
+      if (fs != null) {
+        try {
+          fs.close();
+        } catch (IOException e) {
+          throw new RuntimeException("Failed to close FileSystem");
+        }
+      }
     }
   }
 };

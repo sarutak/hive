@@ -216,7 +216,10 @@ public class HDFSStorage implements TempletonStorage {
 
   @Override
   public void closeStorage() throws IOException {
-    // Nothing to do here
+    if (fs != null) {
+      fs.close();
+      fs = null;
+    }
   }
 
   /**

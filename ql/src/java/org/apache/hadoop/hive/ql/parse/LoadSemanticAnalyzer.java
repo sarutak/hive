@@ -98,7 +98,9 @@ public class LoadSemanticAnalyzer extends BaseSemanticAnalyzer {
         fromScheme = "file";
       } else {
         // use default values from fs.default.name
-        URI defaultURI = FileSystem.get(conf).getUri();
+        FileSystem fs = FileSystem.get(conf);
+        URI defaultURI = fs.getUri();
+        fs.close();
         fromScheme = defaultURI.getScheme();
         fromAuthority = defaultURI.getAuthority();
       }
@@ -106,7 +108,9 @@ public class LoadSemanticAnalyzer extends BaseSemanticAnalyzer {
 
     // if scheme is specified but not authority then use the default authority
     if ((!fromScheme.equals("file")) && StringUtils.isEmpty(fromAuthority)) {
-      URI defaultURI = FileSystem.get(conf).getUri();
+      FileSystem fs = FileSystem.get(conf);
+      URI defaultURI = fs.getUri();
+      fs.close();
       fromAuthority = defaultURI.getAuthority();
     }
 
@@ -123,11 +127,17 @@ public class LoadSemanticAnalyzer extends BaseSemanticAnalyzer {
       throw new SemanticException(ErrorMsg.ILLEGAL_PATH.getMsg(ast,
           "Source file system should be \"file\" if \"local\" is specified"));
     }
-
+    
     try {
-      FileStatus[] srcs = matchFilesOrDir(FileSystem.get(fromURI, conf),
+      FileSystem fs = FileSystem.get(fromURI, conf);
+      FileStatus[] srcs = matchFilesOrDir(fs,
           new Path(fromURI.getScheme(), fromURI.getAuthority(), fromURI
           .getPath()));
+      try {
+        fs.close();
+      } catch (IOException e) {
+        throw new SemanticException(e);
+      }
 
       if (srcs == null || srcs.length == 0) {
         throw new SemanticException(ErrorMsg.INVALID_PATH.getMsg(ast,

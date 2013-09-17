@@ -117,6 +117,13 @@ public class HDFSCleanup extends Thread {
       }
     }
     isRunning = false;
+    if (fs != null) {
+      try {
+        fs.close();
+      } catch (IOException e) {
+        LOG.error("Failed to close FileSystem", e);
+      }
+    }
   }
 
   /**

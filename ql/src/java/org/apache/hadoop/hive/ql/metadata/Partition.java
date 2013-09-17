@@ -19,6 +19,7 @@
 package org.apache.hadoop.hive.ql.metadata;
 
 import java.io.Serializable;
+import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -389,10 +390,11 @@ public class Partition implements Serializable {
    */
   @SuppressWarnings("nls")
   public FileStatus[] getSortedPaths() {
+    FileSystem fs = null;
     try {
       // Previously, this got the filesystem of the Table, which could be
       // different from the filesystem of the partition.
-      FileSystem fs = FileSystem.get(getPartitionPath().toUri(), Hive.get()
+      fs = FileSystem.get(getPartitionPath().toUri(), Hive.get()
           .getConf());
       String pathPattern = getPartitionPath().toString();
       if (getBucketCount() > 0) {
@@ -410,6 +412,14 @@ public class Partition implements Serializable {
       return srcs;
     } catch (Exception e) {
       throw new RuntimeException("Cannot get path ", e);
+    } finally {
+      if (fs != null) {
+        try {
+          fs.close();
+        } catch (IOException e) {
+          throw new RuntimeException("Failed to close FileSystem");
+        }
+      }
     }
   }
 

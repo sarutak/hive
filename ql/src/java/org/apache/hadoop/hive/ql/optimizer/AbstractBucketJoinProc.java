@@ -79,8 +79,9 @@ abstract public class AbstractBucketJoinProc implements NodeProcessor {
   private static List<String> getBucketFilePathsOfPartition(
       URI location, ParseContext pGraphContext) throws SemanticException {
     List<String> fileNames = new ArrayList<String>();
+    FileSystem fs = null;
     try {
-      FileSystem fs = FileSystem.get(location, pGraphContext.getConf());
+      fs = FileSystem.get(location, pGraphContext.getConf());
       FileStatus[] files = fs.listStatus(new Path(location.toString()));
       if (files != null) {
         for (FileStatus file : files) {
@@ -89,6 +90,14 @@ abstract public class AbstractBucketJoinProc implements NodeProcessor {
       }
     } catch (IOException e) {
       throw new SemanticException(e);
+    } finally {
+      if (fs != null) {
+        try {
+          fs.close();
+        } catch (IOException e) {
+            throw new SemanticException(e);
+        }
+      }
     }
     return fileNames;
   }

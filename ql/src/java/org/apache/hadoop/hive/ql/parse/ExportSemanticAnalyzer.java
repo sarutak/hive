@@ -59,8 +59,9 @@ public class ExportSemanticAnalyzer extends BaseSemanticAnalyzer {
     // initialize source table/partition
     tableSpec ts = new tableSpec(db, conf, (ASTNode) tableTree, false, true);
     EximUtil.validateTable(ts.tableHandle);
+    FileSystem fs = null;
     try {
-      FileSystem fs = FileSystem.get(toURI, conf);
+      fs = FileSystem.get(toURI, conf);
       Path toPath = new Path(toURI.getScheme(), toURI.getAuthority(), toURI.getPath());
       try {
         FileStatus tgt = fs.getFileStatus(toPath);
@@ -79,8 +80,15 @@ public class ExportSemanticAnalyzer extends BaseSemanticAnalyzer {
       }
     } catch (IOException e) {
       throw new SemanticException(ErrorMsg.INVALID_PATH.getMsg(ast), e);
+    } finally {
+      if (fs != null) {
+	try {
+          fs.close();
+        } catch (IOException e) {
+            throw new SemanticException(e);
+        }
+      }
     }
-
     List<Partition> partitions = null;
     try {
       partitions = null;

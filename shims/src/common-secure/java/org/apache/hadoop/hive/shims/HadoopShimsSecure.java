@@ -531,9 +531,16 @@ public abstract class HadoopShimsSecure implements HadoopShims {
 
     //get delegation token for user
     String uname = UserGroupInformation.getLoginUser().getShortUserName();
-    FileSystem fs = FileSystem.get(conf);
-    Token<?> fsToken = fs.getDelegationToken(uname);
-
+    FileSystem fs = null;
+    Token<?> fsToken = null;
+    try {
+      fs = FileSystem.get(conf);
+      fsToken = fs.getDelegationToken(uname);
+    } finally {
+	if (fs != null) {
+	  fs.close();
+	}
+    }
     File t = File.createTempFile("hive_hadoop_delegation_token", null);
     Path tokenPath = new Path(t.toURI());
 

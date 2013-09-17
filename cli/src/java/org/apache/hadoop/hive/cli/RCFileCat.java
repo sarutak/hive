@@ -111,8 +111,17 @@ public class RCFileCat implements Tool{
     }
 
     setupBufferedOutput();
-    FileSystem fs = FileSystem.get(fileName.toUri(), conf);
-    long fileLen = fs.getFileStatus(fileName).getLen();
+    FileSystem fs = null;
+    long fileLen;
+    try {
+      fs = FileSystem.get(fileName.toUri(), conf);
+      fileLen = fs.getFileStatus(fileName).getLen();
+    } finally {
+      if (fs != null) {
+        fs.close();
+      }
+    }
+
     if (start < 0) {
       start = 0;
     }

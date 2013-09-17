@@ -316,6 +316,14 @@ public class BlockMergeTask extends Task<MergeWork> implements Serializable,
         }
       } catch (IOException e) {
         e.printStackTrace(System.err);
+      } finally {
+	if (fs != null) {
+          try {
+	    fs.close();
+          } catch (IOException e) {
+            e.printStackTrace(System.err);
+          }
+	}
       }
     }
 

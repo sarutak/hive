@@ -98,7 +98,9 @@ public class EximUtil {
       // if scheme is specified but not authority then use the default
       // authority
       if (StringUtils.isEmpty(authority)) {
-        URI defaultURI = FileSystem.get(conf).getUri();
+        FileSystem fs = FileSystem.get(conf);
+        URI defaultURI = fs.getUri();
+        fs.close();
         authority = defaultURI.getAuthority();
       }
 

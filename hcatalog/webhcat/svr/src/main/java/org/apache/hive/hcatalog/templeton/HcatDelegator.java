@@ -304,14 +304,19 @@ public class HcatDelegator extends LauncherDelegator {
       // If we can get them from HDFS, add group and permission
       String loc = (String) jb.getMap().get("location");
       if (loc != null && loc.startsWith("hdfs://")) {
+        FileSystem fs = null;
         try {
-          FileSystem fs = FileSystem.get(appConf);
+          fs = FileSystem.get(appConf);
           FileStatus status = fs.getFileStatus(new Path(new URI(loc)));
           jb.put("group", status.getGroup());
           jb.put("permission", status.getPermission().toString());
         } catch (Exception e) {
           LOG.warn(e.getMessage() + " Couldn't get permissions for " + loc);
-        }
+        } finally {
+	  if (fs != null) {
+            fs.close();
+	  }
+	}
       }
       return jb.build();
     } catch (HcatException e) {

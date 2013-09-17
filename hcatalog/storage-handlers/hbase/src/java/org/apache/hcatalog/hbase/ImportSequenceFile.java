@@ -149,8 +149,15 @@ class ImportSequenceFile {
         }
 
         private void cleanupScratch(JobContext context) throws IOException {
-          FileSystem fs = FileSystem.get(context.getConfiguration());
-          fs.delete(HFileOutputFormat.getOutputPath(context), true);
+          FileSystem fs = null;
+          try {
+            fs = FileSystem.get(context.getConfiguration());
+            fs.delete(HFileOutputFormat.getOutputPath(context), true);
+          } finally {
+            if (fs != null) {
+              fs.close();
+            }
+          }
         }
       };
     }
@@ -225,8 +232,9 @@ class ImportSequenceFile {
     boolean localMode = "local".equals(conf.get("mapred.job.tracker"));
 
     boolean success = false;
+    FileSystem fs = null;
     try {
-      FileSystem fs = FileSystem.get(parentConf);
+      fs = FileSystem.get(parentConf);
       Path workDir = new Path(new Job(parentConf).getWorkingDirectory(), IMPORTER_WORK_DIR);
       if (!fs.mkdirs(workDir))
         throw new IOException("Importer work directory already exists: " + workDir);
@@ -245,6 +253,10 @@ class ImportSequenceFile {
       LOG.error("ImportSequenceFile Failed", e);
     } catch (IOException e) {
       LOG.error("ImportSequenceFile Failed", e);
+    } finally {
+      if (fs != null) {
+        fs.close();
+      }
     }
     return success;
   }

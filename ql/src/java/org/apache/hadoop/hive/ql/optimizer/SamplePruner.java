@@ -317,9 +317,9 @@ public class SamplePruner implements Transform {
   public static LimitPruneRetStatus limitPrune(Partition part, long sizeLimit, int fileLimit,
       Collection<Path> retPathList)
       throws SemanticException {
-
+    FileSystem fs = null;
     try {
-      FileSystem fs = FileSystem.get(part.getPartitionPath().toUri(), Hive.get()
+      fs = FileSystem.get(part.getPartitionPath().toUri(), Hive.get()
           .getConf());
       String pathPattern = part.getPartitionPath().toString() + "/*";
       AddPathReturnStatus ret = addPath(fs, pathPattern, sizeLimit, fileLimit, retPathList);
@@ -336,8 +336,14 @@ public class SamplePruner implements Transform {
       }
     } catch (Exception e) {
       throw new RuntimeException("Cannot get path", e);
+    } finally {
+      if (fs != null) {
+	try {
+	  fs.close();
+        } catch (IOException e) {
+          throw new RuntimeException("Failed to close FileSystem", e);
+        }
+      }
     }
-
   }
-
 }

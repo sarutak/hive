@@ -1223,8 +1223,15 @@ public class Hive {
       if (replace) {
         Hive.replaceFiles(loadPath, newPartPath, oldPartPath, getConf());
       } else {
-        FileSystem fs = FileSystem.get(tbl.getDataLocation(), getConf());
-        Hive.copyFiles(conf, loadPath, newPartPath, fs);
+        FileSystem fs = null;
+        try {
+          fs = FileSystem.get(tbl.getDataLocation(), getConf());
+          Hive.copyFiles(conf, loadPath, newPartPath, fs);
+        } finally {
+          if (fs != null) {
+	    fs.close();
+	  }
+	}
       }
 
       // recreate the partition if it existed before

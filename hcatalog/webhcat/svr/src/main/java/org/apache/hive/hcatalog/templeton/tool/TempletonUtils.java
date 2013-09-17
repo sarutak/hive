@@ -243,22 +243,29 @@ public class TempletonUtils {
     }
     final String finalFName = new String(fname);
 
-    final FileSystem defaultFs = 
-        ugi.doAs(new PrivilegedExceptionAction<FileSystem>() {
-          public FileSystem run() 
-            throws URISyntaxException, IOException, InterruptedException {
-            return FileSystem.get(new URI(finalFName), conf);
-          }
-        });
+    FileSystem defaultFs = null;
+    try {
+      defaultFs = 
+          ugi.doAs(new PrivilegedExceptionAction<FileSystem>() {
+            public FileSystem run() 
+              throws URISyntaxException, IOException, InterruptedException {
+              return FileSystem.get(new URI(finalFName), conf);
+            }
+          });
 
-    fname = addUserHomeDirectoryIfApplicable(fname, user);
-    URI u = new URI(fname);
-    Path p = new Path(u).makeQualified(defaultFs);
+      fname = addUserHomeDirectoryIfApplicable(fname, user);
+      URI u = new URI(fname);
+      Path p = new Path(u).makeQualified(defaultFs);
 
-    if (hadoopFsIsMissing(defaultFs, p))
-      throw new FileNotFoundException("File " + fname + " does not exist.");
+      if (hadoopFsIsMissing(defaultFs, p))
+        throw new FileNotFoundException("File " + fname + " does not exist.");
 
-    return p;
+      return p;
+    } finally {
+      if (defaultFs != null) {
+        defaultFs.close();
+      }
+    }
   }
 
   /**

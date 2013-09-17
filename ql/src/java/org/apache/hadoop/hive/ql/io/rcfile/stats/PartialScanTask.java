@@ -321,6 +321,14 @@ public class PartialScanTask extends Task<PartialScanWork> implements
         }
       } catch (IOException e) {
         e.printStackTrace(System.err);
+      } finally {
+        if (fs != null) {
+          try {
+       	    fs.close();
+          } catch(IOException e) {
+            e.printStackTrace(System.err);
+          }
+	}
       }
     }
 

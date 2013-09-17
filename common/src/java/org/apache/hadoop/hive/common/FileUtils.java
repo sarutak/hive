@@ -55,7 +55,15 @@ public final class FileUtils {
       // in this case we need to get the working directory
       // and this requires a FileSystem handle. So revert to
       // original method.
-      return path.makeQualified(FileSystem.get(conf));
+      FileSystem fs = null;
+      try {
+        fs = FileSystem.get(conf);
+        return path.makeQualified(fs);
+      } finally {
+        if (fs != null) {
+          fs.close();
+	}
+      }
     }
 
     URI fsUri = FileSystem.getDefaultUri(conf);

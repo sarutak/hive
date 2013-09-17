@@ -1633,8 +1633,15 @@ public class DDLTask extends Task<DDLWork> implements Serializable {
         args.add(copyDest);
 
         console.printInfo("Copying " + copySource + " to " + copyDest);
-        FileSystem srcFs = FileSystem.get(sourceDir.toUri(), conf);
-        srcFs.initialize(sourceDir.toUri(), conf);
+        FileSystem srcFs = null;
+        try {
+          srcFs = FileSystem.get(sourceDir.toUri(), conf);
+          srcFs.initialize(sourceDir.toUri(), conf);
+        } finally {
+          if (srcFs != null) {
+	    srcFs.close();
+	  }
+        }
 
         FsShell fss = new FsShell(conf);
         int ret = 0;

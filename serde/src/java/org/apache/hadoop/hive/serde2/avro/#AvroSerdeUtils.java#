@@ -99,16 +99,16 @@ public class AvroSerdeUtils {
   protected static Schema getSchemaFromHDFS(String schemaHDFSUrl,
                                             Configuration conf) throws IOException {
     FileSystem fs = null;
-    FSDataInputStream in = null;
-
     try {
-      fs = FileSystem.get(conf);
-      in = fs.open(new Path(schemaHDFSUrl));
-      Schema s = Schema.parse(in);
-      return s;
-    } finally {
+    fs = FileSystem.get(conf);
+      FSDataInputStream in = null;
+
+      try {
+        in = fs.open(new Path(schemaHDFSUrl));
+        Schema s = Schema.parse(in);
+        return s;
+      } finally {
       if(in != null) in.close();
-      if(fs != null) fs.close();
     }
   }
 

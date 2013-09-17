@@ -139,9 +139,16 @@ public class SecureProxySupport {
     final TokenWrapper twrapper = new TokenWrapper();
     ugi.doAs(new PrivilegedExceptionAction<Object>() {
       public Object run() throws IOException {
-        FileSystem fs = FileSystem.get(conf);
-        twrapper.token = fs.getDelegationToken(ugi.getShortUserName());
-        return null;
+        FileSystem fs = null;
+        try {
+          fs = FileSystem.get(conf);
+          twrapper.token = fs.getDelegationToken(ugi.getShortUserName());
+          return null;
+        } finally {
+	  if (fs != null) {
+	    fs.close();
+	  }
+	}
       }
     });
     return twrapper.token;
