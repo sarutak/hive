@@ -255,7 +255,11 @@ class ImportSequenceFile {
       LOG.error("ImportSequenceFile Failed", e);
     } finally {
       if (fs != null) {
-        fs.close();
+        try {
+          fs.close();
+        } catch (IOException e) {
+	  LOG.error("Failed to close FileSystem", e);
+        }
       }
     }
     return success;
